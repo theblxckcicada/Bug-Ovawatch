@@ -12,7 +12,7 @@ import { AuthService } from "./core/services/auth.service";
       <header class="topbar">
         <div class="logo">
           <div class="logo-div">
-            <img class="logo-img" src="assets/shadow-grid-mark.svg" alt="ShadowGrid" />
+            <img class="logo-img" src="assets/shadow-grid-mark.png" alt="ShadowGrid" />
           </div>
           <span>SHADOW<span class="logo-accent">GRID</span></span>
         </div>

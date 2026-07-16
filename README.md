@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="frontend/src/assets/shadow-grid-icon.svg" width="132" alt="ShadowGrid logo">
+<img src="frontend/src/assets/shadow-grid-icon.png" width="132" alt="ShadowGrid logo">
 
 # ShadowGrid
 

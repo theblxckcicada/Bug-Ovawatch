@@ -17,7 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
     <div class="auth-wrap">
       <div class="auth-card">
         <div class="auth-logo">
-          <img src="assets/shadow-grid-mark.svg" alt="ShadowGrid" />
+          <img src="assets/shadow-grid-mark.png" alt="ShadowGrid" />
           <span>SHADOW<span class="accent">GRID</span></span>
         </div>
 
