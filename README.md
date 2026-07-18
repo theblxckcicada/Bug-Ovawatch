@@ -113,17 +113,19 @@ The whole stack ships as a **single container** — Angular build, FastAPI backe
 | 2 — Subdomain Enumeration | `crtsh`, `assetfinder`, `subfinder`, `amass`, `shuffledns` | **all parallel** |
 | 3 — DNS Resolution | `dnsx`, `dns_records`, `zone_transfer` | parallel |
 | 4 — HTTP Probing & Ports | `httpx`, `naabu` | parallel |
-| 5 — URL Discovery | `waybackurls`, `gau`, `katana`, `urlfinder` | **all parallel** |
-| 6 — Vuln · Takeover · Screenshots · Dorks · AI | `nuclei`, `subdomain_takeover`, `gowitness`, `whatweb`, `google_dorks`, `ai_analysis` | parallel (AI runs last) |
+| 5 — URL Discovery | `waybackurls`, `gau`, `katana`, `urlfinder` | **all parallel** (URLs are re-probed; dead links dropped) |
+| 6 — Vuln · Takeover · WordPress · Screenshots · Dorks · AI | `nuclei`, `subdomain_takeover`, `wpscan`, `gowitness`, `whatweb`, `google_dorks`, `ai_analysis` | parallel (AI runs last) |
 
 Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_merged.txt` → `alive_subdomains.txt` → `alive_urls.txt` — so each phase feeds the next with clean, de-duplicated, in-scope input.
 
 **Notes**
 - **Cancel:** a running scan can be stopped from the live progress page; the backend kills in-flight tool processes.
 - **Resume vs. fresh:** launching a scan on a project that already has results lets you continue from prior results or start clean.
+- **URL validation** — discovered URLs (waybackurls, gau, katana, urlfinder) are re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before they reach the results. Broken/blank screenshots are likewise discarded.
+- **WordPress scanning** — `wpscan` runs only against hosts fingerprinted as WordPress (via httpx tech-detection), surfacing core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
 - **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
 - **Subdomain takeover** hunts dangling/claimable subdomains (nuclei takeover templates, plus `subzy` when available).
-- **AI analysis** summarises findings when an AI provider key (OpenAI / Anthropic / Google / DeepSeek / Groq) is configured in Settings.
+- **AI analysis** summarises findings when an AI provider key (OpenAI / Anthropic / Google / DeepSeek / Groq) is configured in Settings. With more than one in-scope asset, a **separate analysis is produced per asset**.
 
 ---
 
@@ -141,6 +143,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | naabu | Port scanning |
 | nuclei | Template-based vulnerability scanning |
 | subzy | Subdomain-takeover detection (secondary engine) |
+| wpscan | WordPress vulnerability scanning (WordPress hosts only) |
 | gowitness | Web screenshots |
 | whatweb | Technology fingerprinting |
 | waybackurls | Historical URLs from the Wayback Machine |

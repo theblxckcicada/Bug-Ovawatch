@@ -18,6 +18,8 @@ KEY_ENV_MAP: dict[str, str] = {
     "censys_api_id": "CENSYS_API_ID",
     "censys_api_secret": "CENSYS_API_SECRET",
     "chaos_key": "CHAOS_KEY",
+    # WPScan WordPress Vulnerability Database API token
+    "wpscan_api_token": "WPSCAN_API_TOKEN",
     # Google Programmable Search (for live Google dorking results)
     "google_cse_api_key": "GOOGLE_CSE_API_KEY",
     "google_cse_cx": "GOOGLE_CSE_CX",

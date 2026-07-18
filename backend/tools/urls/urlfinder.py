@@ -21,10 +21,15 @@ class UrlFinderTool(BaseTool):
         list_file = out_dir / "urlfinder_targets.txt"
         list_file.write_text("\n".join(hosts) + "\n")
         outfile = out_dir / "urlfinder.txt"
-        return await self._exec(
+        result = await self._exec(
             ["urlfinder", "-list", str(list_file), "-silent", "-o", str(outfile)],
             timeout=600,
         )
+        raw = self._read_lines(outfile) or [l for l in result.stdout.splitlines() if l.strip().startswith("http")]
+        # urlfinder is passive — drop links whose hosts/pages no longer respond.
+        valid = await self._validate_urls(raw, out_dir, "urlfinder")
+        outfile.write_text("\n".join(valid) + ("\n" if valid else ""))
+        return RunResult("\n".join(valid), result.stderr, result.returncode, result.elapsed)
 
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:
         lines = self._read_lines(self.output_dir / domain / "urlfinder.txt") or result.lines

@@ -38,7 +38,7 @@ PHASES: list[dict[str, object]] = [
     {"index": 3, "name": "DNS Resolution", "tools": ["dnsx", "dns_records", "zone_transfer"]},
     {"index": 4, "name": "HTTP Probing & Port Scanning", "tools": ["httpx", "naabu"]},
     {"index": 5, "name": "URL Discovery", "tools": ["waybackurls", "gau", "katana", "urlfinder"]},
-    {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "subdomain_takeover", "gowitness", "whatweb", "ai_analysis"]},
+    {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "subdomain_takeover", "wpscan", "gowitness", "whatweb", "ai_analysis"]},
 ]
 
 SUBDOMAIN_FILES = (

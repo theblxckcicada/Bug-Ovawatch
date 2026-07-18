@@ -20,6 +20,7 @@ from tools.http.httpx_tool       import HttpxTool
 from tools.http.naabu            import NaabuTool
 from tools.vuln.nuclei           import NucleiTool
 from tools.vuln.subdomain_takeover import SubdomainTakeoverTool
+from tools.vuln.wpscan           import WpscanTool
 from tools.screenshots.gowitness import GowitnessTool
 from tools.screenshots.whatweb   import WhatWebTool
 from tools.urls.waybackurls      import WaybackUrlsTool
@@ -51,6 +52,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     # Vulnerability scanning
     "nuclei":       NucleiTool,
     "subdomain_takeover": SubdomainTakeoverTool,
+    "wpscan":       WpscanTool,
     # Screenshots & Tech
     "gowitness":    GowitnessTool,
     "whatweb":      WhatWebTool,

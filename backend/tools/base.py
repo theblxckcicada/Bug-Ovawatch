@@ -14,6 +14,7 @@ That's it. No other files need to change.
 from __future__ import annotations
 import asyncio
 import contextlib
+import json
 import logging
 import re
 import shutil
@@ -29,6 +30,10 @@ from models import ToolCategory, ToolResult
 logger = logging.getLogger(__name__)
 
 ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+# HTTP statuses that mean the resource is gone. A URL that resolves but returns
+# one of these is treated as "no longer valid" during URL validation.
+URL_GONE_STATUS = {404, 410}
 
 
 def clean_tool_output(value: str) -> str:
@@ -198,6 +203,95 @@ class BaseTool(ABC):
                              f"Timeout after {timeout}s", 1, timeout)
         finally:
             process_registry.unregister(scan_id, proc)
+
+    async def _validate_urls(
+        self,
+        urls: list[str],
+        out_dir: Path,
+        tag: str,
+        *,
+        timeout: int = 900,
+    ) -> list[str]:
+        """Return only the URLs that still respond, dropping stale/dead links.
+
+        Passive URL sources (waybackurls, gau, urlfinder) and crawlers accumulate
+        historical links whose hosts or pages have since disappeared. We re-probe
+        every discovered URL with ProjectDiscovery httpx and keep those that answer
+        with a non-"gone" HTTP status (see ``URL_GONE_STATUS``). Hosts that no longer
+        resolve or refuse the connection produce no output and are dropped.
+
+        Safety: if no httpx binary is available, or the prober errors/returns nothing,
+        the original list is returned unchanged so validation never silently wipes a
+        dataset when the tooling is missing. The spawned prober is registered for
+        cancellation because it runs through :meth:`_exec`.
+        """
+        unique = list(dict.fromkeys(u.strip() for u in urls if u and u.strip().startswith("http")))
+        if not unique:
+            return []
+
+        # Use the ProjectDiscovery binary staged as ``pd-httpx``. A bare ``httpx`` on
+        # PATH is the unrelated Python HTTP client CLI in this project, so it is never
+        # used as a fallback here.
+        prober = shutil.which("pd-httpx")
+        if prober is None:
+            logger.info("[%s] pd-httpx not found — skipping URL validation, keeping %d URL(s)",
+                        self.name, len(unique))
+            return unique
+
+        probe_in = out_dir / f"{tag}_validate_in.txt"
+        probe_in.write_text("\n".join(unique) + "\n")
+
+        try:
+            result = await self._exec([
+                prober, "-silent", "-json", "-no-color",
+                "-list", str(probe_in),
+                "-timeout", "8", "-retries", "0", "-threads", "60",
+            ], timeout=timeout)
+        except Exception:
+            logger.exception("[%s] URL validation prober failed — keeping unvalidated URLs", self.name)
+            return unique
+
+        # Map each probed input URL to the status code it returned.
+        responded: dict[str, int | None] = {}
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            target = obj.get("input") or obj.get("url")
+            if not target:
+                continue
+            code = obj.get("status_code")
+            if code is None:
+                code = obj.get("status-code")
+            responded[str(target).strip()] = code
+
+        # A prober that returned nothing usable (crash, all timeouts) must not be
+        # allowed to erase the whole dataset — keep the unvalidated URLs instead.
+        if not responded:
+            logger.warning("[%s] URL validation produced no output — keeping %d unvalidated URL(s)",
+                           self.name, len(unique))
+            return unique
+
+        # Only when the prober finished normally can absence be read as "dead host".
+        # On a timeout/crash (non-zero exit) httpx may not have reached every URL, so
+        # un-probed URLs are kept rather than mistaken for dead ones.
+        completed = result.returncode == 0
+        valid = []
+        for url in unique:
+            code = responded.get(url)
+            if code in URL_GONE_STATUS:
+                continue                      # confirmed gone (404/410)
+            if code is None and completed:
+                continue                      # probe finished, host never answered → dead
+            valid.append(url)
+
+        logger.info("[%s] URL validation kept %d/%d URL(s)%s",
+                    self.name, len(valid), len(unique), "" if completed else " (probe incomplete — kept unprobed)")
+        return valid
 
     def _write(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

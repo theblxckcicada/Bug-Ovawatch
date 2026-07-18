@@ -21,11 +21,16 @@ class GauTool(BaseTool):
         outfile = out_dir / "gau.txt"
         # --subs keeps results scoped to each host's own subdomains; -o streams to
         # disk so a timeout still leaves whatever was collected.
-        return await self._exec_stdin(
+        result = await self._exec_stdin(
             ["gau", "--subs", "--threads", "5", "--o", str(outfile)],
             "\n".join(hosts),
             timeout=600,
         )
+        raw = self._read_lines(outfile) or [l for l in result.stdout.splitlines() if l.strip().startswith("http")]
+        # gau aggregates archive sources — validate so dead historical links are dropped.
+        valid = await self._validate_urls(raw, out_dir, "gau")
+        outfile.write_text("\n".join(valid) + ("\n" if valid else ""))
+        return RunResult("\n".join(valid), result.stderr, result.returncode, result.elapsed)
 
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:
         lines = self._read_lines(self.output_dir / domain / "gau.txt") or result.lines

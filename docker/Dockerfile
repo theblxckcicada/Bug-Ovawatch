@@ -134,6 +134,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN gem install whatweb --no-document 2>&1 \
     || echo "WARN: whatweb gem install failed — tool will be skipped"
 
+# WPScan (Ruby gem) — WordPress vulnerability scanner
+RUN gem install wpscan --no-document 2>&1 \
+    || echo "WARN: wpscan gem install failed — tool will be skipped"
+
 # Python backend
 WORKDIR /app
 COPY backend/ ./backend/

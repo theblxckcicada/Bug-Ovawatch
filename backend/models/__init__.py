@@ -41,6 +41,7 @@ class ToolCategory(str, Enum):
     TECH         = "tech"
     ASSET        = "asset"
     DORK         = "dork"
+    WORDPRESS    = "wordpress"
     AI           = "ai"
 
 
@@ -140,7 +141,7 @@ class ScanCreate(BaseModel):
             "crtsh","assetfinder","subfinder","amass","shuffledns",
             "dnsx","dns_records","zone_transfer",
             "httpx","naabu",
-            "nuclei","subdomain_takeover","gowitness","whatweb",
+            "nuclei","subdomain_takeover","wpscan","gowitness","whatweb",
             "waybackurls","gau","katana","urlfinder",
             "whois","asnmap",
             "google_dorks","ai_analysis",
@@ -296,6 +297,7 @@ class ToolApiKeysConfig(BaseModel):
     censys_api_id: str = ""
     censys_api_secret: str = ""
     chaos_key: str = ""
+    wpscan_api_token: str = ""
     google_cse_api_key: str = ""
     google_cse_cx: str = ""
     openai_api_key: str = ""

@@ -9,7 +9,7 @@ import { Project, Target, Scan, ToolInfo } from '../../core/models';
 const DEFAULT_TOOLS = [
   'crtsh','assetfinder','subfinder','amass','shuffledns',
   'dnsx','dns_records','zone_transfer',
-  'httpx','naabu','nuclei','subdomain_takeover','gowitness','whatweb',
+  'httpx','naabu','nuclei','subdomain_takeover','wpscan','gowitness','whatweb',
   'waybackurls','gau','katana','urlfinder',
   'whois','asnmap','google_dorks'
 ];
@@ -18,7 +18,7 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'Subdomain Enumeration': ['crtsh','assetfinder','subfinder','amass','shuffledns'],
   'DNS':                   ['dnsx','dns_records','zone_transfer'],
   'HTTP & Ports':          ['httpx','naabu'],
-  'Vulnerability':         ['nuclei','subdomain_takeover'],
+  'Vulnerability':         ['nuclei','subdomain_takeover','wpscan'],
   'Screenshots, Dorks & Tech': ['gowitness','whatweb','google_dorks'],
   'URL Discovery':         ['waybackurls','gau','katana','urlfinder'],
   'Asset Discovery':       ['whois','asnmap'],

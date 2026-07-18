@@ -6,7 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -38,6 +38,7 @@ export class ResultsComponent implements OnInit, AfterViewInit {
     {id:'dns' as TabId, label:'DNS & Assets'},
     {id:'http' as TabId, label:'HTTP & Ports'},
     {id:'vulns' as TabId, label:'Vulns'},
+    {id:'wordpress' as TabId, label:'WordPress'},
     {id:'urls' as TabId, label:'URLs'},
     {id:'tech' as TabId, label:'Tech Stack'},
     {id:'dorks' as TabId, label:'Dorks'},
@@ -90,9 +91,9 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   urls         = computed(() => this.results().filter(r => r.category === 'url').flatMap(r => r.data));
   screenshots  = computed(() => this.byTool('gowitness'));
   dorks        = computed(() => this.byTool('google_dorks'));
+  wpFindings   = computed(() => this.byTool('wpscan'));
+  // One AI report per in-scope asset (each scanned domain produces its own row).
   aiReports    = computed(() => this.byTool('ai_analysis'));
-  aiMarkdown   = computed(() => this.aiReports()[0]?.['markdown'] || 'No AI analysis was generated for this scan.');
-  aiPromptPath = computed(() => this.aiReports()[0]?.['prompt_path'] || '');
   dnsRecords   = computed(() => this.byTool('dns_records'));
   zoneResults  = computed(() => this.byTool('zone_transfer'));
   whoisData    = computed(() => { const d = this.byTool('whois')[0]; return d ? d['whois'] : 'No WHOIS data'; });
@@ -221,10 +222,14 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   tabCount(t: TabId): number {
     const m: Record<TabId,number> = {
       overview:0, subdomains:this.subdomains().length, dns:this.dnsRecords().length,
-      http:this.httpResults().length, vulns:this.vulns().length, urls:this.urls().length,
-      tech:this.techInventory().length, dorks:this.dorks().length, screenshots:this.screenshots().length, ai:this.aiReports().length
+      http:this.httpResults().length, vulns:this.vulns().length, wordpress:this.wpFindings().length,
+      urls:this.urls().length, tech:this.techInventory().length, dorks:this.dorks().length,
+      screenshots:this.screenshots().length, ai:this.aiReports().length
     };
     return m[t] || 0;
+  }
+  wpSites(): number {
+    return new Set(this.wpFindings().map((f: any) => f['url']).filter(Boolean)).size;
   }
   isCommonPort(p: number): boolean { return this.COMMON_PORTS.has(p); }
   portClass(p: number): string { return 'port-chip' + (this.isCommonPort(p) ? ' common' : ''); }
@@ -240,7 +245,11 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   exportHttpUrls()    { this.exportTxt(this.filteredHttp().map((h: any) => h['url']), 'alive_urls.txt'); }
   exportAllUrls()     { this.exportTxt(this.filteredUrls().map((u: any) => u['url']), 'urls.txt'); }
   exportDorks()       { this.exportTxt(this.dorks().map((d: any) => d['dork']), 'google_dorks.txt'); }
-  exportAiMarkdown()  { this.exportTxt([this.aiMarkdown()], 'ai_analysis.md'); }
+  exportAiReport(report: any) {
+    const md = report?.['markdown'] || '';
+    const name = (report?.['domain'] || 'asset').toString().replace(/[^a-z0-9.-]+/gi, '_');
+    this.exportTxt([md], `ai_analysis_${name}.md`);
+  }
 
   copy(text: string)  { navigator.clipboard.writeText(text).catch(() => {}); }
   copyItem(item: any, key: string) { this.copy(item[key] || ''); }
