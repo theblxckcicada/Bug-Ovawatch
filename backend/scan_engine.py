@@ -633,6 +633,21 @@ async def run_scan(
 
     _reuse_maps.pop(scan.id, None)
 
+    # A cancelled scan must leave no data behind. We purge its results and progress
+    # here — after the phase loop has fully unwound and every tool coroutine has
+    # returned — so there is no race with in-flight result persistence. The scan
+    # record itself is kept as a lightweight "cancelled" history entry until the
+    # project's data is cleared. Shared per-domain artifacts are intentionally not
+    # touched because they are not owned by any single scan.
+    if scan.status == ScanStatus.CANCELLED:
+        try:
+            await storage.delete_results(scan.id)
+            scan.progress = []
+            await storage.save_scan(scan)
+            logger.info("Purged data for cancelled scan %s", scan.id)
+        except Exception:
+            logger.exception("Failed to purge data for cancelled scan %s", scan.id)
+
     # Leave queue open briefly so the frontend can drain final events.
     await asyncio.sleep(60)
     drop_progress_queue(scan.id)

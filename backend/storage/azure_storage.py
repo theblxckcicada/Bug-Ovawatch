@@ -115,6 +115,10 @@ class AzureTableStorage(BaseStorage):
         rows = self._query("Scans", f"PartitionKey eq '{project_id}'")
         return [Scan.from_table_entity(r) for r in rows]
 
+    async def delete_scan(self, scan_id: str, project_id: str) -> None:
+        self._delete("Scans", project_id, scan_id)
+        await self.delete_results(scan_id)
+
     # ── Results ────────────────────────────────────────────
     async def save_result(self, r: ToolResult) -> None:
         entity = r.to_table_entity()
@@ -129,6 +133,13 @@ class AzureTableStorage(BaseStorage):
     async def list_results(self, scan_id: str) -> list[ToolResult]:
         rows = self._query("Results", f"PartitionKey eq '{scan_id}'")
         return [ToolResult.from_table_entity(r) for r in rows]
+
+    async def delete_results(self, scan_id: str) -> None:
+        """Delete every Results row partitioned under this scan. Idempotent."""
+        if not self._ok:
+            return
+        for row in self._query("Results", f"PartitionKey eq '{scan_id}'"):
+            self._delete("Results", scan_id, row.get("RowKey", ""))
 
     # ── Config ─────────────────────────────────────────────
     async def save_storage_config(self, config: dict) -> None:
