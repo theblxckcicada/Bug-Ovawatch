@@ -14,25 +14,25 @@ import { Project } from '../../core/models';
     <div class="page">
       <div class="page-header">
         <div>
-          <h1 class="page-title">Projects</h1>
-          <p class="page-sub">Create and manage recon engagements</p>
+          <h1 class="page-title">Programs</h1>
+          <p class="page-sub">Application-security programs and their assessments</p>
         </div>
         <button class="btn btn-primary" (click)="showCreate = !showCreate">
-          + New Project
+          + New Program
         </button>
       </div>
 
       <!-- Create form -->
       @if (showCreate) {
         <div class="card create-card">
-          <h3 class="create-title">New Project</h3>
+          <h3 class="create-title">New Program</h3>
           <div class="form-group">
-            <label class="form-label">Project Name</label>
-            <input class="form-input" [(ngModel)]="newName" placeholder="e.g. example.com bug bounty" />
+            <label class="form-label">Program Name</label>
+            <input class="form-input" [(ngModel)]="newName" placeholder="e.g. Acme Web Platform" />
           </div>
           <div class="form-group">
             <label class="form-label">Description (optional)</label>
-            <textarea class="form-textarea" [(ngModel)]="newDesc" placeholder="Scope details, notes…"></textarea>
+            <textarea class="form-textarea" [(ngModel)]="newDesc" placeholder="Scope, environment, notes…"></textarea>
           </div>
           <div class="create-actions">
             <button class="btn btn-ghost" (click)="showCreate=false">Cancel</button>
@@ -45,23 +45,23 @@ import { Project } from '../../core/models';
         <div class="empty-state"><div class="spinner-sm"></div><span>Loading…</span></div>
       } @else if (projects().length === 0) {
         <div class="empty-state">
-          <div class="empty-icon">◈</div>
-          <h3>No projects yet</h3>
-          <p>Create your first recon project to get started.</p>
+          <div class="empty-icon">🛡️</div>
+          <h3>No programs yet</h3>
+          <p>Create your first application-security program to get started.</p>
         </div>
       } @else {
         <div class="projects-grid">
           @for (p of projects(); track p.id) {
             <div class="project-card" [routerLink]="['/projects', p.id]">
               <div class="pc-head">
-                <span class="pc-icon">◈</span>
+                <span class="pc-icon">▨</span>
                 <span class="pc-name">{{p.name}}</span>
               </div>
               @if (p.description) {
                 <p class="pc-desc">{{p.description}}</p>
               }
               <div class="pc-footer">
-                <span class="pc-scans">{{p.scan_count}} scan{{p.scan_count !== 1 ? 's' : ''}}</span>
+                <span class="pc-scans">{{p.scan_count}} assessment{{p.scan_count !== 1 ? 's' : ''}}</span>
                 <span class="pc-date">{{p.created_at | date:'mediumDate'}}</span>
               </div>
             </div>

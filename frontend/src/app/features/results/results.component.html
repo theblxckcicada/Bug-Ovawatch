@@ -9,9 +9,21 @@
     <div class="empty-state"><div class="spinner-sm"></div><span>Loading results…</span></div>
   } @else {
     <div class="results-header">
-      <h1 class="page-title">Results — {{scanId.slice(0,8)}}…</h1>
-      <button class="btn btn-outline btn-sm" (click)="exportJson()">↓ Export JSON</button>
+      <h1 class="page-title">Assessment results — {{scanId.slice(0,8)}}…</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        @if (isLive()) {
+          <a class="btn btn-outline btn-sm" [routerLink]="['/scan', scanId, 'progress']">Live progress</a>
+        }
+        <button class="btn btn-outline btn-sm" (click)="exportJson()">↓ Export JSON</button>
+      </div>
     </div>
+
+    @if (isLive()) {
+      <div class="alert alert-info" style="display:flex;align-items:center;gap:10px">
+        <span class="pulse-dot"></span>
+        <span>Assessment is still running — results stream in and refresh automatically. Filters and sorting stay put while data updates.</span>
+      </div>
+    }
 
     <!-- Tab bar -->
     <div class="tab-bar">

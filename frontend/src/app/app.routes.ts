@@ -3,7 +3,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'projects', pathMatch: 'full' },
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   {
     path: 'setup',
     data: { mode: 'setup' },
@@ -13,6 +13,16 @@ export const routes: Routes = [
     path: 'login',
     data: { mode: 'login' },
     loadComponent: () => import('./features/auth/login.component').then(m => m.LoginComponent),
+  },
+  {
+    path: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
+  },
+  {
+    path: 'activity',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/activity/activity.component').then(m => m.ActivityComponent),
   },
   {
     path: 'projects',
@@ -39,5 +49,5 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent),
   },
-  { path: '**', redirectTo: 'projects' }
+  { path: '**', redirectTo: 'dashboard' }
 ];

@@ -21,8 +21,16 @@ export class ApiService {
   createProject(name: string, description: string): Observable<Project> {
     return this.http.post<Project>(`${this.base}/projects/`, { name, description });
   }
+  /** Patch editable project fields (name/description) after creation. */
+  updateProject(id: string, changes: { name?: string; description?: string }): Observable<Project> {
+    return this.http.patch<Project>(`${this.base}/projects/${id}`, changes);
+  }
   deleteProject(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/projects/${id}`);
+  }
+  /** Remove all scan history (incl. cancelled) for a project, keeping the project. */
+  clearProjectData(id: string): Observable<{ cleared_scans: number }> {
+    return this.http.post<{ cleared_scans: number }>(`${this.base}/projects/${id}/clear`, {});
   }
 
   // ── Targets ───────────────────────────────────────────────────
