@@ -92,6 +92,24 @@ import { StorageConfig, ToolApiKeysConfig } from '../../core/models';
             <label class="form-label">Chaos API Key</label>
             <input class="form-input" type="password" [(ngModel)]="apiKeys.chaos_key" placeholder="Optional ProjectDiscovery Chaos key" />
           </div>
+
+          <div class="form-group">
+            <label class="form-label">WPScan API Token</label>
+            <input class="form-input" type="password" [(ngModel)]="apiKeys.wpscan_api_token" placeholder="Optional — enables the WordPress Vulnerability Database" />
+            <span class="hint">Stored as <span class="mono">WPSCAN_API_TOKEN</span>. Without it wpscan still runs with built-in checks only.</span>
+          </div>
+
+          <div class="two-col">
+            <div class="form-group">
+              <label class="form-label">Google Search (CSE) API Key</label>
+              <input class="form-input" type="password" [(ngModel)]="apiKeys.google_cse_api_key" placeholder="Enables live Google dorking results" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Google Search Engine ID (cx)</label>
+              <input class="form-input" [(ngModel)]="apiKeys.google_cse_cx" placeholder="Programmable Search Engine ID" />
+            </div>
+          </div>
+          <span class="hint">Without these, dorking falls back to DuckDuckGo for live results.</span>
         </div>
 
         <div class="card ai-card">
@@ -172,6 +190,7 @@ export class SettingsComponent implements OnInit {
   storageCfg: StorageConfig = { azure_enabled:false, connection_string:'', account_name:'', account_key:'', table_prefix:'shadowgrid' };
   apiKeys: ToolApiKeysConfig = {
     pdcp_api_key:'', github_token:'', shodan_api_key:'', censys_api_id:'', censys_api_secret:'', chaos_key:'',
+    wpscan_api_token:'', google_cse_api_key:'', google_cse_cx:'',
     openai_api_key:'', anthropic_api_key:'', google_ai_api_key:'', deepseek_api_key:'', groq_api_key:''
   };
 

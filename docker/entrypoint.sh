@@ -9,7 +9,7 @@ echo ""
 
 # Tool availability check
 echo "[ Tool availability ]"
-for t in assetfinder subfinder amass shuffledns dnsx pd-httpx naabu nuclei \
+for t in assetfinder subfinder amass shuffledns dnsx pd-httpx naabu nuclei subzy \
           gowitness whatweb waybackurls gau katana urlfinder asnmap massdns whois dig; do
     if command -v "$t" &>/dev/null; then
         echo "  ✓  $t"

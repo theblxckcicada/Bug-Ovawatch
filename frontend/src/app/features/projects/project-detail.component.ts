@@ -9,7 +9,7 @@ import { Project, Target, Scan, ToolInfo } from '../../core/models';
 const DEFAULT_TOOLS = [
   'crtsh','assetfinder','subfinder','amass','shuffledns',
   'dnsx','dns_records','zone_transfer',
-  'httpx','naabu','nuclei','gowitness','whatweb',
+  'httpx','naabu','nuclei','subdomain_takeover','wpscan','gowitness','whatweb',
   'waybackurls','gau','katana','urlfinder',
   'whois','asnmap','google_dorks'
 ];
@@ -18,7 +18,7 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'Subdomain Enumeration': ['crtsh','assetfinder','subfinder','amass','shuffledns'],
   'DNS':                   ['dnsx','dns_records','zone_transfer'],
   'HTTP & Ports':          ['httpx','naabu'],
-  'Vulnerability':         ['nuclei'],
+  'Vulnerability':         ['nuclei','subdomain_takeover','wpscan'],
   'Screenshots, Dorks & Tech': ['gowitness','whatweb','google_dorks'],
   'URL Discovery':         ['waybackurls','gau','katana','urlfinder'],
   'Asset Discovery':       ['whois','asnmap'],
@@ -40,18 +40,45 @@ const TOOL_GROUPS: Record<string, string[]> = {
 
       @if (project(); as p) {
         <div class="page-header">
-          <div>
-            <h1 class="page-title">{{p.name}}</h1>
-            @if (p.description) { <p class="page-sub">{{p.description}}</p> }
+          <div style="flex:1;min-width:0">
+            @if (!editing()) {
+              <h1 class="page-title">{{p.name}}</h1>
+              @if (p.description) { <p class="page-sub">{{p.description}}</p> }
+            } @else {
+              <div class="edit-form">
+                <div class="form-group">
+                  <label class="form-label">Program Name</label>
+                  <input class="form-input" [(ngModel)]="editName" placeholder="Program name" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Description</label>
+                  <textarea class="form-textarea" [(ngModel)]="editDesc" placeholder="Scope, environment, notes…"></textarea>
+                </div>
+                <div class="edit-actions">
+                  <button class="btn btn-ghost btn-sm" (click)="cancelEdit()">Cancel</button>
+                  <button class="btn btn-primary btn-sm" [disabled]="!editName.trim() || savingEdit()" (click)="saveEdit()">
+                    @if (savingEdit()) { <span class="spinner-sm"></span> } Save changes
+                  </button>
+                </div>
+              </div>
+            }
           </div>
-          <button class="btn btn-danger btn-sm" (click)="deleteProject()">Delete Project</button>
+          @if (!editing()) {
+            <div class="header-actions">
+              <button class="btn btn-outline btn-sm" (click)="startEdit()">Edit details</button>
+              <button class="btn btn-outline btn-sm" (click)="showClear.set(true)" [disabled]="scans().length === 0">Clear data</button>
+              <button class="btn btn-danger btn-sm" (click)="deleteProject()">Delete</button>
+            </div>
+          }
         </div>
+
+        @if (message()) { <div class="alert alert-success">{{message()}}</div> }
 
         <!-- Tabs -->
         <div class="tab-bar">
-          <button class="tab-btn" [class.active]="tab==='targets'" (click)="tab='targets'">Targets</button>
-          <button class="tab-btn" [class.active]="tab==='scan'" (click)="tab='scan'">Launch Scan</button>
-          <button class="tab-btn" [class.active]="tab==='history'" (click)="tab='history'">Scan History</button>
+          <button class="tab-btn" [class.active]="tab==='targets'" (click)="tab='targets'">Scope</button>
+          <button class="tab-btn" [class.active]="tab==='scan'" (click)="tab='scan'">New Assessment</button>
+          <button class="tab-btn" [class.active]="tab==='history'" (click)="tab='history'">Assessments</button>
         </div>
 
         <!-- Targets -->
@@ -147,21 +174,45 @@ const TOOL_GROUPS: Record<string, string[]> = {
               @if (launching()) { <span class="spinner-sm"></span> } Launch Scan ({{selectedTools.size}} tools)
             </button>
           </div>
+
+          <!-- Resume vs. new scan prompt -->
+          @if (showResumePrompt()) {
+            <div class="modal-backdrop" (click)="cancelResumePrompt()">
+              <div class="modal-card" (click)="$event.stopPropagation()">
+                <h3>Previous scan detected</h3>
+                <p class="modal-text">
+                  This project already has scan results. Continue from the previous
+                  results (reuses finished tools, only runs new/missing ones), or start
+                  a fresh scan from scratch?
+                </p>
+                <div class="modal-actions">
+                  <button class="btn btn-outline btn-sm" (click)="cancelResumePrompt()">Cancel</button>
+                  <button class="btn btn-outline btn-sm" (click)="confirmLaunch(false)">Start New Scan</button>
+                  <button class="btn btn-primary btn-sm" (click)="confirmLaunch(true)">Continue Previous</button>
+                </div>
+              </div>
+            </div>
+          }
         }
 
         <!-- History -->
         @if (tab === 'history') {
           <div class="card">
             <div class="section-head">
-              <span class="section-title">Scan History</span>
+              <span class="section-title">Assessments</span>
               <span class="section-count">{{scans().length}}</span>
+              @if (scans().length > 0) {
+                <div class="section-actions">
+                  <button class="btn btn-outline btn-sm" (click)="showClear.set(true)">Clear all data</button>
+                </div>
+              }
             </div>
             @if (scans().length === 0) {
-              <div class="empty-state"><div class="empty-icon">◈</div><p>No scans run yet</p></div>
+              <div class="empty-state"><div class="empty-icon">🛡️</div><p>No assessments run yet</p></div>
             } @else {
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>Scan ID</th><th>Status</th><th>Tools</th><th>Started</th><th>Completed</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Assessment</th><th>Status</th><th>Tools</th><th>Started</th><th>Completed</th><th>Actions</th></tr></thead>
                   <tbody>
                     @for (s of scans(); track s.id) {
                       <tr>
@@ -171,11 +222,14 @@ const TOOL_GROUPS: Record<string, string[]> = {
                         <td style="font-size:11px;color:var(--text-dim)">{{s.started_at | date:'short'}}</td>
                         <td style="font-size:11px;color:var(--text-dim)">{{s.completed_at | date:'short'}}</td>
                         <td>
-                          @if (s.status === 'running') {
-                            <a class="btn btn-outline btn-sm" [routerLink]="['/scan', s.id, 'progress']">Live</a>
-                          } @else if (s.status === 'completed') {
-                            <a class="btn btn-primary btn-sm" [routerLink]="['/scan', s.id, 'results']">Results</a>
-                          }
+                          <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            @if (s.status === 'running') {
+                              <a class="btn btn-outline btn-sm" [routerLink]="['/scan', s.id, 'progress']">Live</a>
+                              <a class="btn btn-primary btn-sm" [routerLink]="['/scan', s.id, 'results']">Results</a>
+                            } @else if (s.status === 'completed') {
+                              <a class="btn btn-primary btn-sm" [routerLink]="['/scan', s.id, 'results']">Results</a>
+                            }
+                          </div>
                         </td>
                       </tr>
                     }
@@ -183,6 +237,26 @@ const TOOL_GROUPS: Record<string, string[]> = {
                 </table>
               </div>
             }
+          </div>
+        }
+
+        <!-- Clear project data confirmation -->
+        @if (showClear()) {
+          <div class="modal-backdrop" (click)="showClear.set(false)">
+            <div class="modal-card" (click)="$event.stopPropagation()">
+              <h3>Clear program data?</h3>
+              <p class="modal-text">
+                This permanently deletes <strong>all {{scans().length}} assessment(s)</strong> for
+                <strong>{{project()?.name}}</strong> — including cancelled ones — and their results.
+                Any running assessment is stopped first. Targets and the program itself are kept.
+              </p>
+              <div class="modal-actions">
+                <button class="btn btn-ghost btn-sm" (click)="showClear.set(false)">Cancel</button>
+                <button class="btn btn-danger btn-sm" [disabled]="clearing()" (click)="clearData()">
+                  @if (clearing()) { <span class="spinner-sm"></span> } Clear all data
+                </button>
+              </div>
+            </div>
           </div>
         }
       }
@@ -193,9 +267,12 @@ const TOOL_GROUPS: Record<string, string[]> = {
     .breadcrumb { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); margin-bottom:20px; }
     .breadcrumb a { color:var(--accent); }
     .sep { color:var(--text-faint); }
-    .page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+    .page-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:24px; }
     .page-title { font-family:var(--font-head); font-size:24px; font-weight:700; }
     .page-sub { color:var(--text-dim); font-size:13px; margin-top:4px; }
+    .header-actions { display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .edit-form { max-width:560px; }
+    .edit-actions { display:flex; gap:8px; justify-content:flex-end; }
     .targets-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media (max-width:700px) { .targets-layout { grid-template-columns:1fr; } }
     .add-target { display:flex; gap:8px; margin-bottom:14px; }
@@ -214,6 +291,11 @@ const TOOL_GROUPS: Record<string, string[]> = {
     .tool-name { font-family:var(--font-mono); font-size:12px; }
     .ai-warning { flex-basis:100%; font-size:11px; color:var(--sev-medium); padding:4px 2px; }
     input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:200; }
+    .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; max-width:460px; width:90%; }
+    .modal-card h3 { font-family:var(--font-head); font-weight:600; margin-bottom:10px; }
+    .modal-text { color:var(--text-dim); font-size:13px; line-height:1.5; margin-bottom:20px; }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
   `]
 })
 export class ProjectDetailComponent implements OnInit {
@@ -222,6 +304,15 @@ export class ProjectDetailComponent implements OnInit {
   scans = signal<Scan[]>([]);
   availableTools = signal<ToolInfo[]>([]);
   launching = signal(false);
+  showResumePrompt = signal(false);
+  // Edit-details + clear-data state (T4/T5 surfaced in the UI).
+  editing = signal(false);
+  savingEdit = signal(false);
+  showClear = signal(false);
+  clearing = signal(false);
+  message = signal('');
+  editName = '';
+  editDesc = '';
   tab = 'targets';
   newTarget = '';
   newOos = '';
@@ -283,18 +374,94 @@ export class ProjectDetailComponent implements OnInit {
     available.forEach(t => allOn ? this.selectedTools.delete(t) : this.selectedTools.add(t));
   }
 
+  /** A finished prior scan means we can offer to resume from its results. */
+  private hasPriorScan(): boolean {
+    return this.scans().some(s => ['completed', 'cancelled', 'failed'].includes(s.status));
+  }
+
   launchScan() {
+    if (this.inscope().length === 0 || this.launching()) return;
+    // If the project already has results, ask whether to resume or start fresh.
+    if (this.hasPriorScan()) {
+      this.showResumePrompt.set(true);
+      return;
+    }
+    this.startScan(false);
+  }
+
+  confirmLaunch(reusePrevious: boolean) {
+    this.showResumePrompt.set(false);
+    this.startScan(reusePrevious);
+  }
+
+  cancelResumePrompt() {
+    this.showResumePrompt.set(false);
+  }
+
+  private startScan(reusePrevious: boolean) {
     if (this.inscope().length === 0) return;
     this.launching.set(true);
-    this.api.startScan(this.project()!.id, [...this.selectedTools], this.customWordlist || undefined)
+    this.api.startScan(this.project()!.id, [...this.selectedTools], this.customWordlist || undefined, reusePrevious)
       .subscribe({
         next: scan => this.router.navigate(['/scan', scan.id, 'progress']),
         error: () => this.launching.set(false),
       });
   }
 
+  // ── Edit details (T4) ───────────────────────────────────────────
+  startEdit() {
+    const p = this.project();
+    if (!p) return;
+    this.editName = p.name;
+    this.editDesc = p.description || '';
+    this.message.set('');
+    this.editing.set(true);
+  }
+
+  cancelEdit() {
+    this.editing.set(false);
+  }
+
+  saveEdit() {
+    const p = this.project();
+    if (!p || !this.editName.trim() || this.savingEdit()) return;
+    this.savingEdit.set(true);
+    this.api.updateProject(p.id, { name: this.editName.trim(), description: this.editDesc.trim() })
+      .subscribe({
+        next: updated => {
+          this.project.set(updated);
+          this.savingEdit.set(false);
+          this.editing.set(false);
+          this.flash('Program details updated.');
+        },
+        error: () => this.savingEdit.set(false),
+      });
+  }
+
+  // ── Clear all program data (T5) ─────────────────────────────────
+  clearData() {
+    const p = this.project();
+    if (!p || this.clearing()) return;
+    this.clearing.set(true);
+    this.api.clearProjectData(p.id).subscribe({
+      next: res => {
+        this.clearing.set(false);
+        this.showClear.set(false);
+        this.scans.set([]);
+        this.project.update(cur => cur ? { ...cur, scan_count: 0 } : cur);
+        this.flash(`Cleared ${res.cleared_scans} assessment(s) and their data.`);
+      },
+      error: () => this.clearing.set(false),
+    });
+  }
+
+  private flash(msg: string) {
+    this.message.set(msg);
+    setTimeout(() => this.message.set(''), 4000);
+  }
+
   deleteProject() {
-    if (!confirm('Delete this project and all its data?')) return;
+    if (!confirm('Delete this program and all its data?')) return;
     this.api.deleteProject(this.project()!.id).subscribe(() => this.router.navigate(['/projects']));
   }
 }

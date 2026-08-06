@@ -29,13 +29,16 @@ logger = logging.getLogger(__name__)
 # scan_id → asyncio.Queue of SSE event dicts
 _progress_queues: dict[str, asyncio.Queue] = {}
 
+# scan_id → {(domain, tool): ToolResult} reused from a prior scan when resuming.
+_reuse_maps: dict[str, dict[tuple[str, str], ToolResult]] = {}
+
 PHASES: list[dict[str, object]] = [
     {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap"]},
     {"index": 2, "name": "Subdomain Enumeration", "tools": ["crtsh", "assetfinder", "subfinder", "amass", "shuffledns"]},
     {"index": 3, "name": "DNS Resolution", "tools": ["dnsx", "dns_records", "zone_transfer"]},
     {"index": 4, "name": "HTTP Probing & Port Scanning", "tools": ["httpx", "naabu"]},
     {"index": 5, "name": "URL Discovery", "tools": ["waybackurls", "gau", "katana", "urlfinder"]},
-    {"index": 6, "name": "Vulnerability Scan, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "gowitness", "whatweb", "ai_analysis"]},
+    {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "subdomain_takeover", "wpscan", "gowitness", "whatweb", "ai_analysis"]},
 ]
 
 SUBDOMAIN_FILES = (
@@ -130,6 +133,25 @@ async def _emit(
 async def _scan_cancelled(scan: Scan, storage: DualStorage) -> bool:
     latest = await storage.get_scan(scan.id)
     return bool(latest and latest.status == ScanStatus.CANCELLED)
+
+
+async def _build_reuse_map(scan: Scan, storage: DualStorage) -> dict[tuple[str, str], ToolResult]:
+    """Map (domain, tool) → prior successful ToolResult from the project's most recent
+    earlier scan, so a resumed scan can continue instead of repeating finished work."""
+    reuse: dict[tuple[str, str], ToolResult] = {}
+    try:
+        prior_scans = [s for s in await storage.list_scans(scan.project_id) if s.id != scan.id]
+        prior_scans.sort(key=lambda s: s.created_at, reverse=True)
+        # Walk newest → oldest; first non-empty result for a (domain, tool) wins.
+        for prev in prior_scans:
+            for result in await storage.list_results(prev.id):
+                if result.count <= 0 or result.error:
+                    continue
+                key = (result.domain, result.tool)
+                reuse.setdefault(key, result)
+    except Exception:
+        logger.exception("Could not build reuse map for scan %s", scan.id)
+    return reuse
 
 
 def _extract_host(value: str) -> str:
@@ -341,6 +363,27 @@ async def _run_tool(
         )
         return None
 
+    # Resume support: if this is a resumed scan and a prior successful result exists
+    # for (domain, tool), copy it forward instead of re-running the tool.
+    prior = _reuse_maps.get(scan.id, {}).get((domain, tool_name))
+    if prior is not None:
+        reused = ToolResult(
+            scan_id=scan.id, project_id=scan.project_id, tool=tool_name,
+            category=prior.category, domain=domain, data=prior.data,
+            count=prior.count, elapsed_s=prior.elapsed_s, error="",
+        )
+        await storage.save_result(reused)
+        completed_tools_ref["value"] += 1
+        overall_completed_tools_ref["value"] += 1
+        await _emit(
+            scan, storage, tool_name, "done", f"{prior.count} results (reused)", prior.count,
+            domain=domain, phase=phase, phase_index=phase_index,
+            completed_tools=completed_tools_ref["value"], total_tools=total_tools,
+            overall_completed_tools=overall_completed_tools_ref["value"],
+            overall_total_tools=overall_total_tools,
+        )
+        return reused
+
     availability_error = tool.availability_error()
     if availability_error:
         completed_tools_ref["value"] += 1
@@ -488,9 +531,14 @@ async def run_scan(
     output_dir: Path,
     data_dir: Path,
     storage: DualStorage,
+    reuse_previous: bool = False,
 ) -> None:
     """Main scan coroutine — called by the API background task or CLI."""
     apply_tool_api_keys(await storage.load_tool_api_keys())
+
+    if reuse_previous:
+        _reuse_maps[scan.id] = await _build_reuse_map(scan, storage)
+        logger.info("Resuming scan %s — reusing %d prior result(s)", scan.id, len(_reuse_maps[scan.id]))
 
     scan.status = ScanStatus.RUNNING
     scan.started_at = datetime.now(timezone.utc)
@@ -582,6 +630,23 @@ async def run_scan(
         overall_completed_tools=overall_completed_ref["value"],
         overall_total_tools=overall_total_tools,
     )
+
+    _reuse_maps.pop(scan.id, None)
+
+    # A cancelled scan must leave no data behind. We purge its results and progress
+    # here — after the phase loop has fully unwound and every tool coroutine has
+    # returned — so there is no race with in-flight result persistence. The scan
+    # record itself is kept as a lightweight "cancelled" history entry until the
+    # project's data is cleared. Shared per-domain artifacts are intentionally not
+    # touched because they are not owned by any single scan.
+    if scan.status == ScanStatus.CANCELLED:
+        try:
+            await storage.delete_results(scan.id)
+            scan.progress = []
+            await storage.save_scan(scan)
+            logger.info("Purged data for cancelled scan %s", scan.id)
+        except Exception:
+            logger.exception("Failed to purge data for cancelled scan %s", scan.id)
 
     # Leave queue open briefly so the frontend can drain final events.
     await asyncio.sleep(60)

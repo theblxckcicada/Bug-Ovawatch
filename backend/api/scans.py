@@ -57,6 +57,7 @@ async def create_scan(body: ScanCreate, background_tasks: BackgroundTasks):
         output_dir=Path(settings.output_dir),
         data_dir=Path(settings.data_dir),
         storage=storage,
+        reuse_previous=body.reuse_previous,
     )
 
     return scan
@@ -75,12 +76,42 @@ async def get_scan(scan_id: str):
     return scan
 
 
+async def _cancel(scan_id: str) -> dict:
+    """Mark a running scan cancelled and terminate its live tool processes."""
+    import process_registry
+
+    storage = _get_storage()
+    scan = await storage.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+    if scan.status != ScanStatus.RUNNING:
+        return {"cancelled": False, "status": scan.status.value}
+
+    scan.status = ScanStatus.CANCELLED
+    await storage.save_scan(scan)
+    terminated = await process_registry.terminate_scan(scan_id)
+
+    # Delete the cancelled scan's data immediately. The running scan coroutine also
+    # purges on exit (the authoritative pass that wins any race with a tool still
+    # flushing its result); doing it here as well guarantees cleanup even when no
+    # engine task is alive to reach that final pass (e.g. after a backend restart
+    # left the scan marked RUNNING). Both passes are idempotent.
+    await storage.delete_results(scan_id)
+    scan.progress = []
+    await storage.save_scan(scan)
+
+    return {"cancelled": True, "terminated_processes": terminated, "status": "cancelled"}
+
+
+@router.post("/{scan_id}/cancel")
+async def cancel_scan_post(scan_id: str):
+    """Stop a running scan and kill any in-flight tool processes."""
+    return await _cancel(scan_id)
+
+
 @router.delete("/{scan_id}", status_code=204)
 async def cancel_scan(scan_id: str):
-    scan = await _get_storage().get_scan(scan_id)
-    if scan and scan.status == ScanStatus.RUNNING:
-        scan.status = ScanStatus.CANCELLED
-        await _get_storage().save_scan(scan)
+    await _cancel(scan_id)
 
 
 @router.get("/{scan_id}/progress")

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,7 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -15,10 +15,12 @@ type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'urls'|'tech'|'dorks'|
   templateUrl: './results.component.html',
   styleUrls: ['./results.component.scss'],
 })
-export class ResultsComponent implements OnInit, AfterViewInit {
+export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   scanId!: string;
   results = signal<ToolResult[]>([]);
   loading = signal(true);
+  scanStatus = signal<string>('');
+  private pollHandle?: number;
   activeTab = signal<TabId>('overview');
   lightbox: any = null;
   subQ = signal('');
@@ -38,6 +40,7 @@ export class ResultsComponent implements OnInit, AfterViewInit {
     {id:'dns' as TabId, label:'DNS & Assets'},
     {id:'http' as TabId, label:'HTTP & Ports'},
     {id:'vulns' as TabId, label:'Vulns'},
+    {id:'wordpress' as TabId, label:'WordPress'},
     {id:'urls' as TabId, label:'URLs'},
     {id:'tech' as TabId, label:'Tech Stack'},
     {id:'dorks' as TabId, label:'Dorks'},
@@ -55,7 +58,44 @@ export class ResultsComponent implements OnInit, AfterViewInit {
       next: rs => { this.results.set(rs); this.loading.set(false); this.initCharts(); },
       error: () => this.loading.set(false),
     });
+    // Watch scan status so the results table can be viewed and interacted with
+    // while the assessment is still running, refreshing data in place (T6).
+    this.refreshStatus();
+    this.pollHandle = window.setInterval(() => this.tick(), 5000);
   }
+
+  ngOnDestroy() {
+    if (this.pollHandle) window.clearInterval(this.pollHandle);
+  }
+
+  /** True while the underlying scan is still producing results. */
+  isLive(): boolean {
+    return this.scanStatus() === 'running' || this.scanStatus() === 'pending';
+  }
+
+  private tick() {
+    this.refreshStatus();
+    if (this.isLive()) {
+      // Re-fetch results without touching filter/sort/pagination signals, so the
+      // user keeps interacting while new rows stream in.
+      this.api.getResults(this.scanId).subscribe({
+        next: rs => { this.results.set(rs); this.initCharts(); },
+        error: () => {},
+      });
+    } else if (this.pollHandle) {
+      // Scan finished — one final refresh already happened; stop polling.
+      window.clearInterval(this.pollHandle);
+      this.pollHandle = undefined;
+    }
+  }
+
+  private refreshStatus() {
+    this.api.getScan(this.scanId).subscribe({
+      next: scan => this.scanStatus.set(scan.status),
+      error: () => {},
+    });
+  }
+
   ngAfterViewInit() { setTimeout(() => this.initCharts(), 200); }
 
   setTab(t: TabId) {
@@ -90,9 +130,9 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   urls         = computed(() => this.results().filter(r => r.category === 'url').flatMap(r => r.data));
   screenshots  = computed(() => this.byTool('gowitness'));
   dorks        = computed(() => this.byTool('google_dorks'));
+  wpFindings   = computed(() => this.byTool('wpscan'));
+  // One AI report per in-scope asset (each scanned domain produces its own row).
   aiReports    = computed(() => this.byTool('ai_analysis'));
-  aiMarkdown   = computed(() => this.aiReports()[0]?.['markdown'] || 'No AI analysis was generated for this scan.');
-  aiPromptPath = computed(() => this.aiReports()[0]?.['prompt_path'] || '');
   dnsRecords   = computed(() => this.byTool('dns_records'));
   zoneResults  = computed(() => this.byTool('zone_transfer'));
   whoisData    = computed(() => { const d = this.byTool('whois')[0]; return d ? d['whois'] : 'No WHOIS data'; });
@@ -221,10 +261,14 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   tabCount(t: TabId): number {
     const m: Record<TabId,number> = {
       overview:0, subdomains:this.subdomains().length, dns:this.dnsRecords().length,
-      http:this.httpResults().length, vulns:this.vulns().length, urls:this.urls().length,
-      tech:this.techInventory().length, dorks:this.dorks().length, screenshots:this.screenshots().length, ai:this.aiReports().length
+      http:this.httpResults().length, vulns:this.vulns().length, wordpress:this.wpFindings().length,
+      urls:this.urls().length, tech:this.techInventory().length, dorks:this.dorks().length,
+      screenshots:this.screenshots().length, ai:this.aiReports().length
     };
     return m[t] || 0;
+  }
+  wpSites(): number {
+    return new Set(this.wpFindings().map((f: any) => f['url']).filter(Boolean)).size;
   }
   isCommonPort(p: number): boolean { return this.COMMON_PORTS.has(p); }
   portClass(p: number): string { return 'port-chip' + (this.isCommonPort(p) ? ' common' : ''); }
@@ -240,7 +284,11 @@ export class ResultsComponent implements OnInit, AfterViewInit {
   exportHttpUrls()    { this.exportTxt(this.filteredHttp().map((h: any) => h['url']), 'alive_urls.txt'); }
   exportAllUrls()     { this.exportTxt(this.filteredUrls().map((u: any) => u['url']), 'urls.txt'); }
   exportDorks()       { this.exportTxt(this.dorks().map((d: any) => d['dork']), 'google_dorks.txt'); }
-  exportAiMarkdown()  { this.exportTxt([this.aiMarkdown()], 'ai_analysis.md'); }
+  exportAiReport(report: any) {
+    const md = report?.['markdown'] || '';
+    const name = (report?.['domain'] || 'asset').toString().replace(/[^a-z0-9.-]+/gi, '_');
+    this.exportTxt([md], `ai_analysis_${name}.md`);
+  }
 
   copy(text: string)  { navigator.clipboard.writeText(text).catch(() => {}); }
   copyItem(item: any, key: string) { this.copy(item[key] || ''); }

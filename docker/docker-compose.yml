@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: shadow-grid:1.0.0
+    image: shadow-grid:3.0.0
     container_name: shadowgrid
     ports:
       - "8080:80"

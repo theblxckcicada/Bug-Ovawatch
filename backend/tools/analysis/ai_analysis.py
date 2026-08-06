@@ -98,6 +98,7 @@ class AIAnalysisTool(BaseTool):
             "katana": "katana.txt",
             "urlfinder": "urlfinder.txt",
             "nuclei": "nuclei_results.jsonl",
+            "wpscan": "wpscan.txt",
             "whatweb": "whatweb.txt",
             "google_dorks": "google_dorks.md",
             "alive_urls": "alive_urls.txt",
@@ -245,6 +246,7 @@ class AIAnalysisTool(BaseTool):
         content = _read_text(analysis_path, 120_000) or result.stdout
         return [{
             "title": f"AI Recon Analysis — {domain}",
+            "domain": domain,
             "markdown": content,
             "path": str(analysis_path.relative_to(self.output_dir)) if analysis_path.exists() else "",
             "prompt_path": str(prompt_path.relative_to(self.output_dir)) if prompt_path.exists() else "",

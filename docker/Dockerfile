@@ -64,6 +64,11 @@ RUN go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest \
 RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest \
     && cp /go/bin/nuclei /staging/
 
+# subzy — secondary subdomain-takeover engine (nuclei takeover templates are primary)
+RUN go install github.com/PentestPad/subzy@latest \
+    && cp /go/bin/subzy /staging/ \
+    || echo "WARN: subzy build failed — takeover detection still works via nuclei"
+
 RUN go install github.com/sensepost/gowitness@latest \
     && cp /go/bin/gowitness /staging/
 
@@ -128,6 +133,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # WhatWeb (Ruby gem)
 RUN gem install whatweb --no-document 2>&1 \
     || echo "WARN: whatweb gem install failed — tool will be skipped"
+
+# WPScan (Ruby gem) — WordPress vulnerability scanner
+RUN gem install wpscan --no-document 2>&1 \
+    || echo "WARN: wpscan gem install failed — tool will be skipped"
 
 # Python backend
 WORKDIR /app

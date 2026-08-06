@@ -37,10 +37,18 @@ class BaseStorage(ABC):
     async def list_scans(self, project_id: str) -> list[Scan]: ...
 
     @abstractmethod
+    async def delete_scan(self, scan_id: str, project_id: str) -> None:
+        """Delete a scan record and all of its results. Idempotent."""
+
+    @abstractmethod
     async def save_result(self, result: ToolResult) -> None: ...
 
     @abstractmethod
     async def list_results(self, scan_id: str) -> list[ToolResult]: ...
+
+    @abstractmethod
+    async def delete_results(self, scan_id: str) -> None:
+        """Delete every stored result for a scan. Idempotent."""
 
     @abstractmethod
     async def save_storage_config(self, config: dict) -> None: ...
@@ -53,3 +61,10 @@ class BaseStorage(ABC):
 
     @abstractmethod
     async def load_tool_api_keys(self) -> dict: ...
+
+    # ── Auth (local-only control-plane secret; not mirrored to Azure) ──
+    async def save_auth(self, record: dict) -> None:
+        raise NotImplementedError
+
+    async def load_auth(self) -> dict:
+        raise NotImplementedError

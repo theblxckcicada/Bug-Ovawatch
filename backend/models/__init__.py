@@ -41,6 +41,7 @@ class ToolCategory(str, Enum):
     TECH         = "tech"
     ASSET        = "asset"
     DORK         = "dork"
+    WORDPRESS    = "wordpress"
     AI           = "ai"
 
 
@@ -60,6 +61,17 @@ class ResultSeverity(str, Enum):
 class ProjectCreate(BaseModel):
     name: str
     description: str = ""
+
+
+class ProjectUpdate(BaseModel):
+    """Partial update for a project's editable fields.
+
+    Every field is optional so a PATCH can change only what the caller sends
+    (e.g. just the description). ``None`` means "leave the stored value
+    unchanged"; an empty string is a valid new value for ``description``.
+    """
+    name: Optional[str] = Field(default=None, min_length=1)
+    description: Optional[str] = None
 
 
 class Project(BaseModel):
@@ -140,13 +152,16 @@ class ScanCreate(BaseModel):
             "crtsh","assetfinder","subfinder","amass","shuffledns",
             "dnsx","dns_records","zone_transfer",
             "httpx","naabu",
-            "nuclei","gowitness","whatweb",
+            "nuclei","subdomain_takeover","wpscan","gowitness","whatweb",
             "waybackurls","gau","katana","urlfinder",
             "whois","asnmap",
             "google_dorks","ai_analysis",
         ]
     )
     wordlist: Optional[str] = None
+    # When True, reuse successful tool results from the project's most recent scan
+    # instead of re-running those tools — lets a new scan continue prior work.
+    reuse_previous: bool = False
 
 
 class ScanProgress(BaseModel):
@@ -293,6 +308,9 @@ class ToolApiKeysConfig(BaseModel):
     censys_api_id: str = ""
     censys_api_secret: str = ""
     chaos_key: str = ""
+    wpscan_api_token: str = ""
+    google_cse_api_key: str = ""
+    google_cse_cx: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_ai_api_key: str = ""

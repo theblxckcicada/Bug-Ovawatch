@@ -68,12 +68,18 @@ class DualStorage(BaseStorage):
     async def list_scans(self, project_id: str) -> list[Scan]:
         return await self._file.list_scans(project_id)
 
+    async def delete_scan(self, scan_id: str, project_id: str) -> None:
+        await self._both("delete_scan", scan_id, project_id)
+
     # ── Results ──────────────────────────────────────────────
     async def save_result(self, r: ToolResult) -> None:
         await self._both("save_result", r)
 
     async def list_results(self, scan_id: str) -> list[ToolResult]:
         return await self._file.list_results(scan_id)
+
+    async def delete_results(self, scan_id: str) -> None:
+        await self._both("delete_results", scan_id)
 
     # ── Config ───────────────────────────────────────────────
     async def save_storage_config(self, config: dict) -> None:
@@ -87,3 +93,10 @@ class DualStorage(BaseStorage):
 
     async def load_tool_api_keys(self) -> dict:
         return await self._file.load_tool_api_keys()
+
+    # ── Auth (local file only — never mirrored to Azure) ──────
+    async def save_auth(self, record: dict) -> None:
+        await self._file.save_auth(record)
+
+    async def load_auth(self) -> dict:
+        return await self._file.load_auth()

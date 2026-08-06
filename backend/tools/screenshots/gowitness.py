@@ -1,10 +1,16 @@
 """gowitness — web screenshots (v2/v3 compatible)."""
 from __future__ import annotations
+import contextlib
 from pathlib import Path
 from typing import Any
 
 from models import ToolCategory
 from tools.base import BaseTool, RunResult
+
+# Magic-byte signatures for the image formats gowitness emits. A capture that does
+# not start with one of these (or is essentially empty) is a failed/blank shot.
+_IMAGE_SIGNATURES = (b"\x89PNG", b"\xff\xd8\xff", b"RIFF", b"GIF8")
+_MIN_SCREENSHOT_BYTES = 1024
 
 
 class GowitnessTool(BaseTool):
@@ -57,6 +63,22 @@ class GowitnessTool(BaseTool):
 
         return result
 
+    @staticmethod
+    def _is_valid_screenshot(path: Path) -> bool:
+        """True when the file is a non-trivial image (real capture, not a blank/error).
+
+        gowitness can leave behind 0-byte or truncated files when a page fails to
+        render; those are removed so the results only surface valid screenshots.
+        """
+        try:
+            if not path.is_file() or path.stat().st_size < _MIN_SCREENSHOT_BYTES:
+                return False
+            with path.open("rb") as fh:
+                head = fh.read(4)
+            return any(head.startswith(sig) for sig in _IMAGE_SIGNATURES)
+        except Exception:
+            return False
+
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:
         ss_dir = self.output_dir / domain / "screenshots"
         if not ss_dir.exists():
@@ -64,7 +86,13 @@ class GowitnessTool(BaseTool):
         files = []
         for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
             files.extend(ss_dir.rglob(pattern))
-        return [
-            {"filename": f.name, "path": str(f.relative_to(self.output_dir)), "source": "gowitness"}
-            for f in sorted(set(files))
-        ]
+
+        rows = []
+        for f in sorted(set(files)):
+            if self._is_valid_screenshot(f):
+                rows.append({"filename": f.name, "path": str(f.relative_to(self.output_dir)), "source": "gowitness"})
+            else:
+                # Drop broken/blank captures so they don't clutter the gallery.
+                with contextlib.suppress(Exception):
+                    f.unlink()
+        return rows

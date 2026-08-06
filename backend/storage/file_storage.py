@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,12 @@ class FileStorage(BaseStorage):
     async def list_scans(self, project_id: str) -> list[Scan]:
         return [Scan(**d) for d in self._read_all(self._meta / "scans" / project_id)]
 
+    async def delete_scan(self, scan_id: str, project_id: str) -> None:
+        """Remove a scan's metadata record and all of its results. Idempotent."""
+        path = self._meta / "scans" / project_id / f"{scan_id}.json"
+        path.unlink(missing_ok=True)
+        await self.delete_results(scan_id)
+
     # ── Results ────────────────────────────────────────────
     async def save_result(self, result: ToolResult) -> None:
         path = self._meta / "results" / result.scan_id / f"{result.id}.json"
@@ -104,6 +111,16 @@ class FileStorage(BaseStorage):
     async def list_results(self, scan_id: str) -> list[ToolResult]:
         return [ToolResult(**d) for d in self._read_all(self._meta / "results" / scan_id)]
 
+    async def delete_results(self, scan_id: str) -> None:
+        """Remove the whole results directory for a scan. Idempotent.
+
+        Deletion is strictly confined to ``.meta/results/<scan_id>/``; the shared
+        per-domain artifact directories under the output root are intentionally
+        left untouched because they are not owned by a single scan.
+        """
+        results_dir = self._meta / "results" / scan_id
+        shutil.rmtree(results_dir, ignore_errors=True)
+
     # ── Config ─────────────────────────────────────────────
     async def save_storage_config(self, config: dict) -> None:
         self._write(self._meta / "storage_config.json", config)
@@ -116,3 +133,10 @@ class FileStorage(BaseStorage):
 
     async def load_tool_api_keys(self) -> dict:
         return self._read(self._meta / "tool_api_keys.json") or {}
+
+    # ── Auth ───────────────────────────────────────────────
+    async def save_auth(self, record: dict) -> None:
+        self._write(self._meta / "auth.json", record)
+
+    async def load_auth(self) -> dict:
+        return self._read(self._meta / "auth.json") or {}

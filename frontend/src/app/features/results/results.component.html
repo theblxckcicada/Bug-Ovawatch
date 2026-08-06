@@ -9,9 +9,21 @@
     <div class="empty-state"><div class="spinner-sm"></div><span>Loading results…</span></div>
   } @else {
     <div class="results-header">
-      <h1 class="page-title">Results — {{scanId.slice(0,8)}}…</h1>
-      <button class="btn btn-outline btn-sm" (click)="exportJson()">↓ Export JSON</button>
+      <h1 class="page-title">Assessment results — {{scanId.slice(0,8)}}…</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        @if (isLive()) {
+          <a class="btn btn-outline btn-sm" [routerLink]="['/scan', scanId, 'progress']">Live progress</a>
+        }
+        <button class="btn btn-outline btn-sm" (click)="exportJson()">↓ Export JSON</button>
+      </div>
     </div>
+
+    @if (isLive()) {
+      <div class="alert alert-info" style="display:flex;align-items:center;gap:10px">
+        <span class="pulse-dot"></span>
+        <span>Assessment is still running — results stream in and refresh automatically. Filters and sorting stay put while data updates.</span>
+      </div>
+    }
 
     <!-- Tab bar -->
     <div class="tab-bar">
@@ -30,6 +42,9 @@
         <div class="stat-card accent"><div class="stat-label">Alive Hosts</div><div class="stat-value green">{{aliveCount()}}</div></div>
         <div class="stat-card"><div class="stat-label">Open Ports</div><div class="stat-value cyan">{{ports().length}}</div></div>
         <div class="stat-card" [class.danger]="critHigh()>0"><div class="stat-label">Vulnerabilities</div><div class="stat-value" [class.red]="critHigh()>0">{{vulns().length}}</div></div>
+        @if (wpFindings().length) {
+          <div class="stat-card"><div class="stat-label">WordPress Findings</div><div class="stat-value">{{wpFindings().length}}</div></div>
+        }
         <div class="stat-card"><div class="stat-label">URLs Found</div><div class="stat-value">{{urls().length}}</div></div>
         <div class="stat-card"><div class="stat-label">Screenshots</div><div class="stat-value">{{screenshots().length}}</div></div>
       </div>
@@ -235,6 +250,45 @@
       }
     }
 
+    <!-- ── WORDPRESS (wpscan) ── -->
+    @if (activeTab() === 'wordpress') {
+      @if (wpFindings().length === 0) {
+        <div class="empty-state"><div class="empty-icon">⬡</div><p>No WordPress findings. wpscan only runs against hosts fingerprinted as WordPress.</p></div>
+      } @else {
+        <div class="stat-grid" style="margin-bottom:16px">
+          <div class="stat-card accent"><div class="stat-label">WordPress Sites</div><div class="stat-value green">{{wpSites()}}</div></div>
+          <div class="stat-card"><div class="stat-label">Findings</div><div class="stat-value">{{wpFindings().length}}</div></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Severity</th><th>Type</th><th>Component</th><th>Finding</th><th>Version</th><th>Fixed In</th><th>Site</th></tr></thead>
+            <tbody>
+              @for (f of wpFindings(); track $index) {
+                <tr>
+                  <td><span class="badge badge-{{f['severity']}}">{{f['severity']}}</span></td>
+                  <td><span class="badge badge-tool">{{f['wp_type']}}</span></td>
+                  <td class="td-mono" style="font-size:11px">{{f['component'] || '—'}}</td>
+                  <td style="max-width:340px">
+                    <div style="font-size:12px">{{f['title'] || '—'}}</div>
+                    @if ((f['references'] || []).length) {
+                      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                        @for (r of f['references']; track r) {
+                          <a class="tech-pill" [href]="r" target="_blank" style="font-size:9px">{{r}}</a>
+                        }
+                      </div>
+                    }
+                  </td>
+                  <td class="td-mono" style="font-size:11px">{{f['version'] || '—'}}</td>
+                  <td class="td-mono" style="font-size:11px">{{f['fixed_in'] || '—'}}</td>
+                  <td class="td-url"><a [href]="f['url']" target="_blank">{{f['url']}}</a></td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        </div>
+      }
+    }
+
     <!-- ── URL DISCOVERY ── -->
     @if (activeTab() === 'urls') {
       <div class="stat-grid" style="margin-bottom:16px">
@@ -304,6 +358,15 @@
               <div style="flex:1;min-width:0">
                 <div class="url-text" style="white-space:normal;color:var(--text-main)">{{d['purpose']}}</div>
                 <div class="td-mono" style="font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis">{{d['dork']}}</div>
+                @if (d['url'] && d['engine'] !== 'manual') {
+                  <a class="url-text" style="white-space:normal;display:block;margin-top:4px;font-size:12px" [href]="d['url']" target="_blank">
+                    {{d['title'] || d['url']}}
+                  </a>
+                  @if (d['snippet']) {
+                    <div style="font-size:11px;color:var(--text-dim);margin-top:2px">{{d['snippet'] | slice:0:200}}</div>
+                  }
+                  <span class="badge badge-tool" style="font-size:8px;margin-top:2px">via {{d['engine']}}</span>
+                }
               </div>
               <a class="btn btn-outline btn-sm" [href]="d['google_url']" target="_blank">open</a>
               <button class="copy-btn" (click)="copyItem(d, 'dork')">copy</button>
@@ -352,16 +415,21 @@
       @if (aiReports().length === 0) {
         <div class="empty-state"><div class="empty-icon">◆</div><p>No AI analysis. Select AI Analysis during scan and configure an AI key in Settings.</p></div>
       } @else {
-        <div class="card ai-report">
-          <div class="section-head" style="margin-bottom:12px">
-            <span class="section-title">AI Recon Analysis</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              @if (aiPromptPath()) { <a class="btn btn-outline btn-sm" [href]="artifactPath(aiPromptPath())" target="_blank">Prompt .md</a> }
-              <button class="btn btn-outline btn-sm" (click)="exportAiMarkdown()">↓ Download .md</button>
+        @if (aiReports().length > 1) {
+          <p class="page-sub" style="margin-bottom:12px">{{aiReports().length}} in-scope assets — one AI recon analysis per asset.</p>
+        }
+        @for (report of aiReports(); track $index) {
+          <div class="card ai-report" style="margin-bottom:16px">
+            <div class="section-head" style="margin-bottom:12px">
+              <span class="section-title">{{report['title'] || 'AI Recon Analysis'}}</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                @if (report['prompt_path']) { <a class="btn btn-outline btn-sm" [href]="artifactPath(report['prompt_path'])" target="_blank">Prompt .md</a> }
+                <button class="btn btn-outline btn-sm" (click)="exportAiReport(report)">↓ Download .md</button>
+              </div>
             </div>
+            <pre class="markdown-preview">{{report['markdown'] || 'No AI analysis was generated for this asset.'}}</pre>
           </div>
-          <pre class="markdown-preview">{{aiMarkdown()}}</pre>
-        </div>
+        }
       }
     }
   }
