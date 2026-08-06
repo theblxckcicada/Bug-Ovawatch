@@ -90,6 +90,16 @@ async def _cancel(scan_id: str) -> dict:
     scan.status = ScanStatus.CANCELLED
     await storage.save_scan(scan)
     terminated = await process_registry.terminate_scan(scan_id)
+
+    # Delete the cancelled scan's data immediately. The running scan coroutine also
+    # purges on exit (the authoritative pass that wins any race with a tool still
+    # flushing its result); doing it here as well guarantees cleanup even when no
+    # engine task is alive to reach that final pass (e.g. after a backend restart
+    # left the scan marked RUNNING). Both passes are idempotent.
+    await storage.delete_results(scan_id)
+    scan.progress = []
+    await storage.save_scan(scan)
+
     return {"cancelled": True, "terminated_processes": terminated, "status": "cancelled"}
 
 

@@ -25,6 +25,7 @@ type ProgressRow = ScanProgressEvent & { key: string };
         </div>
         <div class="header-right">
           @if (!done()) {
+            <a class="btn btn-outline btn-sm" [routerLink]="['/scan', scanId, 'results']">Results so far</a>
             <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancelScan()">
               @if (cancelling()) { <span class="spinner-sm"></span> } Cancel Scan
             </button>
@@ -52,28 +53,39 @@ type ProgressRow = ScanProgressEvent & { key: string };
         </div>
       }
 
-      <div class="progress-list">
-        @for (ev of events(); track ev.key) {
-          <div class="progress-item" [class]="'pi-' + ev.status">
-            <div class="pi-icon">
-              @switch (ev.status) {
-                @case ('running') { <span class="spinner-sm"></span> }
-                @case ('done') { <span class="pi-check">✓</span> }
-                @case ('completed') { <span class="pi-check">✓</span> }
-                @case ('error') { <span class="pi-x">✗</span> }
-                @case ('failed') { <span class="pi-x">✗</span> }
-                @case ('skipped') { <span class="pi-skip">—</span> }
-                @case ('cancelled') { <span class="pi-skip">—</span> }
-              }
+      <div class="domain-grid">
+        @for (g of domainGroups(); track g.domain) {
+          <div class="domain-card" [class.dc-active]="g.running && !done()">
+            <div class="dc-head">
+              @if (g.running && !done()) { <span class="spinner-sm"></span> } @else { <span class="dc-dot">◆</span> }
+              <span class="dc-domain mono">{{g.domain}}</span>
+              <span class="dc-count mono">{{g.done}}/{{g.total}}</span>
             </div>
-            <div class="pi-main">
-              <div class="pi-line">
-                <span class="pi-tool">{{ev.tool}}</span>
-                @if (ev.domain) { <span class="pi-domain">{{ev.domain}}</span> }
-                @if (ev.count) { <span class="pi-count">{{ev.count}} results</span> }
-                <span class="badge badge-{{ev.status}}">{{ev.status}}</span>
-              </div>
-              @if (ev.message) { <div class="pi-msg">{{ev.message}}</div> }
+            <div class="dc-bar"><div class="dc-fill" [style.width.%]="g.total ? (g.done / g.total) * 100 : 0"></div></div>
+            <div class="dc-list">
+              @for (ev of g.rows; track ev.key) {
+                <div class="progress-item" [class]="'pi-' + ev.status">
+                  <div class="pi-icon">
+                    @switch (ev.status) {
+                      @case ('running') { <span class="spinner-sm"></span> }
+                      @case ('done') { <span class="pi-check">✓</span> }
+                      @case ('completed') { <span class="pi-check">✓</span> }
+                      @case ('error') { <span class="pi-x">✗</span> }
+                      @case ('failed') { <span class="pi-x">✗</span> }
+                      @case ('skipped') { <span class="pi-skip">—</span> }
+                      @case ('cancelled') { <span class="pi-skip">—</span> }
+                    }
+                  </div>
+                  <div class="pi-main">
+                    <div class="pi-line">
+                      <span class="pi-tool">{{ev.tool}}</span>
+                      @if (ev.count) { <span class="pi-count">{{ev.count}} results</span> }
+                      <span class="badge badge-{{ev.status}}">{{ev.status}}</span>
+                    </div>
+                    @if (ev.message) { <div class="pi-msg">{{ev.message}}</div> }
+                  </div>
+                </div>
+              }
             </div>
           </div>
         }
@@ -90,8 +102,18 @@ type ProgressRow = ScanProgressEvent & { key: string };
     </div>
   `,
   styles: [`
-    .page { padding:32px; max-width:900px; margin:0 auto; }
+    .page { padding:32px; max-width:1240px; margin:0 auto; }
     .breadcrumb { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); margin-bottom:20px; }
+    .domain-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:14px; margin-bottom:20px; }
+    .domain-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:14px 16px; box-shadow:var(--shadow); }
+    .domain-card.dc-active { border-color:rgba(251,155,63,.4); }
+    .dc-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .dc-dot { color:var(--accent); font-size:12px; }
+    .dc-domain { font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dc-count { font-size:11px; color:var(--text-dim); }
+    .dc-bar { height:5px; background:var(--bg-elevated); border-radius:999px; overflow:hidden; margin-bottom:12px; }
+    .dc-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--cyan)); transition:width 250ms ease; }
+    .dc-list { display:flex; flex-direction:column; gap:6px; }
     .breadcrumb a { color:var(--accent); }
     .sep { color:var(--text-faint); }
     .progress-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
@@ -151,6 +173,28 @@ export class ScanProgressComponent implements OnInit, OnDestroy {
     if (s === 'failed') return '✗ Scan failed';
     if (s === 'cancelled') return '— Scan cancelled';
     return '✓ Scan completed';
+  });
+
+  /**
+   * Group progress rows by domain so a multi-domain scan renders as one card per
+   * domain instead of a single ever-growing stacked list. Each group carries its
+   * own completed/total counts for a per-domain progress bar.
+   */
+  private static readonly TERMINAL = ['done', 'completed', 'error', 'failed', 'skipped', 'cancelled'];
+  domainGroups = computed(() => {
+    const groups = new Map<string, ProgressRow[]>();
+    for (const ev of this.events()) {
+      const key = ev.domain || 'general';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(ev);
+    }
+    return [...groups.entries()].map(([domain, rows]) => ({
+      domain,
+      rows,
+      done: rows.filter(r => ScanProgressComponent.TERMINAL.includes(r.status)).length,
+      total: rows.length,
+      running: rows.some(r => r.status === 'running'),
+    }));
   });
 
   private es?: EventSource;

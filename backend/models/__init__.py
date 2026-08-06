@@ -63,6 +63,17 @@ class ProjectCreate(BaseModel):
     description: str = ""
 
 
+class ProjectUpdate(BaseModel):
+    """Partial update for a project's editable fields.
+
+    Every field is optional so a PATCH can change only what the caller sends
+    (e.g. just the description). ``None`` means "leave the stored value
+    unchanged"; an empty string is a valid new value for ``description``.
+    """
+    name: Optional[str] = Field(default=None, min_length=1)
+    description: Optional[str] = None
+
+
 class Project(BaseModel):
     id: str = Field(default_factory=new_id)
     name: str

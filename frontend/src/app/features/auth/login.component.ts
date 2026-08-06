@@ -18,15 +18,18 @@ import { AuthService } from '../../core/services/auth.service';
       <div class="auth-card">
         <div class="auth-logo">
           <img src="assets/shadow-grid-mark.png" alt="ShadowGrid" />
-          <span>SHADOW<span class="accent">GRID</span></span>
+          <div class="auth-brand">
+            <span>Shadow<span class="accent">Grid</span></span>
+            <small>Application Security Platform</small>
+          </div>
         </div>
 
         @if (mode() === 'setup') {
           <h1>Create a password</h1>
           <p class="sub">First run — set a password to protect this instance.</p>
         } @else {
-          <h1>Sign in</h1>
-          <p class="sub">Enter your password to continue.</p>
+          <h1>Welcome back</h1>
+          <p class="sub">Sign in to your AppSec workspace.</p>
         }
 
         <div class="form-group">
@@ -53,10 +56,13 @@ import { AuthService } from '../../core/services/auth.service';
     </div>
   `,
   styles: [`
-    .auth-wrap { min-height:calc(100vh - var(--topbar-h)); display:flex; align-items:center; justify-content:center; padding:24px; }
+    .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
     .auth-card { width:100%; max-width:380px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; }
-    .auth-logo { display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:900; letter-spacing:.12em; margin-bottom:24px; }
-    .auth-logo img { width:42px; height:42px; }
+    .auth-logo { display:flex; align-items:center; gap:12px; font-family:var(--font-head); font-weight:750; margin-bottom:24px; }
+    .auth-logo img { width:44px; height:44px; border-radius:10px; }
+    .auth-brand { display:flex; flex-direction:column; line-height:1.2; }
+    .auth-brand span { font-size:20px; letter-spacing:-.01em; }
+    .auth-brand small { font-family:var(--font-mono); font-size:9.5px; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); margin-top:3px; }
     .auth-logo .accent { color:var(--accent); }
     h1 { font-family:var(--font-head); font-size:20px; font-weight:700; margin-bottom:4px; }
     .sub { color:var(--text-dim); font-size:13px; margin-bottom:20px; }

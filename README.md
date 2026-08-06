@@ -4,13 +4,13 @@
 
 # ShadowGrid
 
-**Automated attack-surface reconnaissance — light up what's exposed before someone else does.**
+**An application-security platform — map, assess, and track the security posture of every app you own.**
 
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)
 ![Angular](https://img.shields.io/badge/Frontend-Angular%2017-DD0031?logo=angular&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Tools](https://img.shields.io/badge/recon%20tools-20%2B-00e87a)
+![Tools](https://img.shields.io/badge/security%20tools-20%2B-00e884)
 
 </div>
 
@@ -18,19 +18,23 @@
 
 ## Overview
 
-**ShadowGrid** is a full-stack reconnaissance automation framework that orchestrates 20+ best-in-class open-source recon tools into a single, phased, parallelised pipeline behind a clean web UI.
+**ShadowGrid** is a full-stack **application-security (AppSec) platform**. It turns 20+ best-in-class open-source security tools into a single, phased, parallelised assessment pipeline behind a modern SaaS-style web app — with a posture dashboard, cross-program scan activity, and a unified findings view.
 
-You define a **project** and its in-scope (and out-of-scope) targets, choose your tools, and launch a **scan**. ShadowGrid walks the engagement through six deterministic phases — asset discovery, subdomain enumeration, DNS resolution, HTTP probing & port scanning, URL discovery, and vulnerability scanning / screenshots / dorking / AI analysis — running independent tools in parallel, streaming **live progress over SSE**, and collecting every finding into a unified results dashboard.
+You organise work into **programs** (an application and its in-scope / out-of-scope scope), then launch **assessments** against them. Each assessment walks six deterministic phases — asset discovery, subdomain enumeration, DNS resolution, HTTP probing & port scanning, URL discovery, and vulnerability scanning / WordPress / screenshots / dorking / AI analysis — running independent tools in parallel, streaming **live progress over SSE**, and collecting every finding into one dashboard.
 
-It's built for **bug-bounty hunters, penetration testers, and security teams** who want repeatable, resumable external recon without hand-wiring a dozen CLIs and reconciling their output by hand.
+It's built for **security teams, penetration testers, and bug-bounty hunters** who want repeatable, resumable, trackable AppSec assessments without hand-wiring a dozen CLIs and reconciling their output by hand. (Attack-surface / asset enumeration is one phase of the pipeline — not the whole product.)
 
-> The name says what it does: a **grid** of recon nodes mapping a target's attack surface — everything sits in **shadow** until a scan lights it up, with a live reticle locked on the host being probed (exactly what the logo depicts).
+> The name says what it does: a **grid** of security probes mapping an application's exposure — everything sits in **shadow** until an assessment lights it up, with a live reticle locked on the host being probed (exactly what the logo depicts).
 
 ### Why ShadowGrid
 
-- **One pipeline, many tools** — subfinder, amass, httpx, naabu, nuclei, katana, gowitness and more, coordinated so each phase hands clean artifacts to the next.
+- **A platform, not a script** — a posture **Dashboard**, a cross-program **Scan Activity** board, per-program **Assessments**, and a multi-tab findings view, all in a light/dark SaaS UI.
+- **One pipeline, many tools** — subfinder, amass, httpx, naabu, nuclei, katana, wpscan, gowitness and more, coordinated so each phase hands clean artifacts to the next.
 - **Phase gating** — a phase never starts until the previous one has fully drained and written its hand-off files (e.g. merged subdomains → alive hosts → alive URLs), so downstream tools always get real input.
-- **Live, resumable, cancellable** — watch every tool report in real time, stop a run mid-flight (in-flight processes are terminated), or resume a project and reuse prior successful results instead of re-running finished work.
+- **Validated data** — discovered URLs are re-probed and dead links dropped before they reach results; WordPress scanning is driven off the validated alive-URL set.
+- **Live & interactive** — watch every tool report in real time (grouped per domain, not stacked), and **browse, filter and sort the results table while the assessment is still running**.
+- **Resumable & cancellable** — stop a run mid-flight (in-flight processes are terminated **and the cancelled assessment's data is deleted**), or resume a program and reuse prior successful results instead of re-running finished work.
+- **Editable & tidy** — rename a program or edit its description after creation, and **clear all of a program's assessment history** (including cancelled runs) in one click.
 - **Scope-aware** — out-of-scope patterns (incl. wildcards) are filtered at every stage, so results stay inside your authorisation.
 - **Bring your own storage** — always-on local JSON/file storage, with optional mirroring to Azure Table Storage.
 
@@ -48,8 +52,21 @@ docker compose -f docker/docker-compose.yml up --build -d
 Open **http://localhost:8080**, then:
 
 1. **Set a password** (required on first visit) and log in.
-2. **Create a project** and **add targets** (mark any out-of-scope domains).
-3. **Select tools** and **launch a scan** — watch live progress, then open the results dashboard.
+2. Land on the **Dashboard** (security posture across all programs).
+3. **Create a program** and define its **scope** (in-scope apps + any out-of-scope patterns).
+4. **Select tools** and **launch an assessment** — watch grouped live progress, browse results as they stream in, then review the full findings dashboard.
+
+---
+
+## Web interface
+
+A modern, SaaS-style single-page app with a light/dark theme toggle (it follows your OS preference until you choose):
+
+- **Dashboard** — security-posture overview: programs, active assessments, completed assessments, and a recent-activity feed.
+- **Programs** — create/manage application-security programs; each card shows its assessment count. Inside a program you can **edit its name/description**, define **scope**, launch a **new assessment**, review the **assessments** history, and **clear all program data** (a guarded action that removes every assessment — including cancelled ones — and their results, while keeping the program and its scope).
+- **Scan Activity** — a cross-program board of running and recent assessments as clean status cards, so scanning many domains at once stays readable instead of stacking into one long list.
+- **Live progress** — per-assessment view that groups tools into a card **per domain**, each with its own progress bar; cancel from here, or jump straight to the results collected **so far**.
+- **Results** — multi-tab findings (subdomains, DNS, HTTP/ports, vulns, WordPress, URLs, tech, dorks, screenshots, AI). The table is fully interactive — **sort/filter/paginate while the assessment is still running**, and it refreshes in place without losing your place.
 
 ---
 
@@ -75,16 +92,19 @@ By default the reset rotates the token-signing secret (logging out all sessions)
 
 ```
 ┌─────────────────────────────────────────┐
-│  Browser (Angular 17)                    │
-│  - Project & target management           │
-│  - Scan config + tool selection          │
-│  - Live progress (Server-Sent Events)    │
-│  - Results dashboard (multi-tab)         │
+│  Browser (Angular 17, light/dark SaaS)   │
+│  - Posture dashboard + scan activity     │
+│  - Program / scope management + editing  │
+│  - Assessment config + tool selection    │
+│  - Live progress (SSE), grouped by domain│
+│  - Interactive results (live while running)│
 └────────────────┬─────────────────────────┘
                  │ HTTP / SSE   (nginx reverse proxy)
 ┌────────────────▼─────────────────────────┐
 │  FastAPI Backend (Python 3.12)           │
 │  - REST API: projects / scans / results  │
+│      · PATCH project (edit details)      │
+│      · POST project/clear (wipe history) │
 │  - Async phased + parallel scan engine   │
 │  - Pluggable tool abstraction layer      │
 │  - Single-password auth (bearer tokens)  │
@@ -119,10 +139,12 @@ The whole stack ships as a **single container** — Angular build, FastAPI backe
 Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_merged.txt` → `alive_subdomains.txt` → `alive_urls.txt` — so each phase feeds the next with clean, de-duplicated, in-scope input.
 
 **Notes**
-- **Cancel:** a running scan can be stopped from the live progress page; the backend kills in-flight tool processes.
-- **Resume vs. fresh:** launching a scan on a project that already has results lets you continue from prior results or start clean.
-- **URL validation** — discovered URLs (waybackurls, gau, katana, urlfinder) are re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before they reach the results. Broken/blank screenshots are likewise discarded.
-- **WordPress scanning** — `wpscan` runs only against hosts fingerprinted as WordPress (via httpx tech-detection), surfacing core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
+- **Cancel deletes data:** a running assessment can be stopped from the live progress page. The backend kills in-flight tool processes **and deletes that assessment's data** (results + progress) — the run remains in history marked `cancelled`, but holds nothing until you clear it. Shared per-domain artifacts (used by other assessments of the same domain) are left intact.
+- **Clear program data:** from a program's page you can wipe **all** of its assessment history — every run including cancelled ones, and their results — while keeping the program and its scope. Any still-running assessment is terminated first.
+- **Edit program details:** a program's name and description can be changed at any time after creation (`PATCH /api/projects/{id}`).
+- **Resume vs. fresh:** launching an assessment on a program that already has results lets you continue from prior results or start clean.
+- **URL validation** — every discovered URL (waybackurls, gau, katana, urlfinder) is re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before it reaches the results. Broken/blank screenshots are likewise discarded.
+- **WordPress scanning** — `wpscan` runs only against WordPress sites, but now draws its targets from **both** signals: hosts fingerprinted as WordPress (httpx tech-detection / whatweb) **and the validated alive-URL set** — any alive URL carrying a WordPress marker (`/wp-login.php`, `/wp-content/`, `/xmlrpc.php`, `/wp-json`, …) or living on a WordPress-fingerprinted host is scanned (normalised to its site root, capped per domain). It surfaces core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
 - **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
 - **Subdomain takeover** hunts dangling/claimable subdomains (nuclei takeover templates, plus `subzy` when available).
 - **AI analysis** summarises findings when an AI provider key (OpenAI / Anthropic / Google / DeepSeek / Groq) is configured in Settings. With more than one in-scope asset, a **separate analysis is produced per asset**.
@@ -244,14 +266,36 @@ That's it — the scan engine, API, and UI pick it up automatically.
 shadow-grid/
 ├── backend/            FastAPI app, scan engine, tool layer, storage, auth
 │   ├── scan_engine.py      phased + parallel orchestration
-│   ├── tools/              one module per recon tool (+ registry.py)
+│   ├── tools/              one module per security tool (+ registry.py)
 │   ├── storage/            file + Azure dual storage
+│   ├── tests/              pytest suite (URL validation, wpscan targets, storage, endpoints)
 │   └── reset_password.py   offline password-reset utility
-├── frontend/           Angular 17 SPA (projects, scans, live progress, results)
+├── frontend/           Angular 17 SPA — dashboard, programs, scan activity,
+│                       live progress, interactive results (light/dark)
 ├── docker/             Dockerfile, docker-compose.yml, nginx.conf, entrypoint.sh
 ├── data/               wordlists, resolvers and other tool data
 └── recon.py            CLI entry point (same engine as the web app)
 ```
+
+---
+
+## Development & Tests
+
+```bash
+# Backend — unit tests (no network / recon binaries required)
+cd backend
+pip install -r requirements.txt pytest
+python -m pytest tests/ -q
+
+# Frontend — type-check + production build
+cd frontend
+npm ci
+npx ng build
+```
+
+The backend test suite covers the pure logic behind the assessment lifecycle:
+URL liveness validation, wpscan target selection (including the alive-URL
+signal), scan/result deletion, and the project update/clear endpoints.
 
 ---
 
