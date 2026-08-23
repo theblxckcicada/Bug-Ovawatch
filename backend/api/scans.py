@@ -40,7 +40,27 @@ async def create_scan(body: ScanCreate, background_tasks: BackgroundTasks):
     if not in_scope:
         raise HTTPException(400, "No in-scope targets defined for this project")
 
-    scan = Scan(project_id=body.project_id, tools=body.tools, wordlist=body.wordlist)
+    from tools.registry import REGISTRY
+    selected_tools = list(dict.fromkeys(body.tools))
+    unknown_tools = sorted(set(selected_tools) - set(REGISTRY))
+    if unknown_tools:
+        raise HTTPException(422, f"Unknown tools: {', '.join(unknown_tools)}")
+    if not selected_tools:
+        raise HTTPException(422, "Select at least one tool")
+    if len(selected_tools) > settings.max_tools_per_scan:
+        raise HTTPException(422, "Too many tools selected")
+
+    wordlist = None
+    if body.wordlist:
+        from pathlib import Path
+        data_root = Path(settings.data_dir).resolve()
+        requested = Path(body.wordlist)
+        candidate = requested.resolve() if requested.is_absolute() else (data_root / requested).resolve()
+        if data_root not in candidate.parents or not candidate.is_file():
+            raise HTTPException(422, "Wordlist must be an existing file under the configured data directory")
+        wordlist = str(candidate)
+
+    scan = Scan(project_id=body.project_id, tools=selected_tools, wordlist=wordlist)
     await storage.save_scan(scan)
 
     project.scan_count += 1
@@ -97,6 +117,7 @@ async def _cancel(scan_id: str) -> dict:
     # engine task is alive to reach that final pass (e.g. after a backend restart
     # left the scan marked RUNNING). Both passes are idempotent.
     await storage.delete_results(scan_id)
+    await storage.delete_scan_artifacts(scan)
     scan.progress = []
     await storage.save_scan(scan)
 

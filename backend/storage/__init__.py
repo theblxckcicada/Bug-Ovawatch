@@ -6,6 +6,7 @@ import logging
 from models import Project, Target, Scan, ToolResult
 from storage.base import BaseStorage
 from storage.file_storage import FileStorage
+from inventory import InventorySnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,11 @@ class DualStorage(BaseStorage):
     def __init__(self, output_dir: str):
         self._file = FileStorage(output_dir)
         self._azure: BaseStorage | None = None
+
+    @property
+    def output_dir(self) -> str:
+        """Return the local evidence output root."""
+        return self._file.output_dir
 
     def enable_azure(self, conn_str: str = "", account: str = "",
                      key: str = "", prefix: str = "shadowgrid") -> None:
@@ -69,6 +75,9 @@ class DualStorage(BaseStorage):
         return await self._file.list_scans(project_id)
 
     async def delete_scan(self, scan_id: str, project_id: str) -> None:
+        scan = await self.get_scan(scan_id)
+        if scan:
+            await self.delete_scan_artifacts(scan)
         await self._both("delete_scan", scan_id, project_id)
 
     # ── Results ──────────────────────────────────────────────
@@ -81,15 +90,26 @@ class DualStorage(BaseStorage):
     async def delete_results(self, scan_id: str) -> None:
         await self._both("delete_results", scan_id)
 
+    async def delete_scan_artifacts(self, scan: Scan) -> None:
+        await self._file.delete_scan_artifacts(scan)
+
+    async def save_inventory(self, snapshot: InventorySnapshot) -> None:
+        # Inventory snapshots may exceed Azure Table entity limits; raw snapshots
+        # remain local until a dedicated object/database adapter is configured.
+        await self._file.save_inventory(snapshot)
+
+    async def load_inventory(self, scan_id: str) -> InventorySnapshot | None:
+        return await self._file.load_inventory(scan_id)
+
     # ── Config ───────────────────────────────────────────────
     async def save_storage_config(self, config: dict) -> None:
-        await self._both("save_storage_config", config)
+        await self._file.save_storage_config(config)
 
     async def load_storage_config(self) -> dict:
         return await self._file.load_storage_config()
 
     async def save_tool_api_keys(self, config: dict) -> None:
-        await self._both("save_tool_api_keys", config)
+        await self._file.save_tool_api_keys(config)
 
     async def load_tool_api_keys(self) -> dict:
         return await self._file.load_tool_api_keys()

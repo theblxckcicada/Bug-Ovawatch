@@ -2,6 +2,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from models import Project, Target, Scan, ToolResult
+from inventory import InventorySnapshot
 
 
 class BaseStorage(ABC):
@@ -49,6 +50,18 @@ class BaseStorage(ABC):
     @abstractmethod
     async def delete_results(self, scan_id: str) -> None:
         """Delete every stored result for a scan. Idempotent."""
+
+    async def delete_scan_artifacts(self, scan: Scan) -> None:
+        """Delete the isolated filesystem workspace owned by a scan."""
+        return None
+
+    async def save_inventory(self, snapshot: InventorySnapshot) -> None:
+        """Persist a normalized inventory snapshot."""
+        raise NotImplementedError
+
+    async def load_inventory(self, scan_id: str) -> InventorySnapshot | None:
+        """Load a normalized inventory snapshot when one exists."""
+        raise NotImplementedError
 
     @abstractmethod
     async def save_storage_config(self, config: dict) -> None: ...

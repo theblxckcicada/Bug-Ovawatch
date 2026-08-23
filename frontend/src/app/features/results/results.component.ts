@@ -3,10 +3,10 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
-import { ToolResult } from '../../core/models';
+import { InventoryDelta, InventorySnapshot, ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'inventory'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -18,6 +18,8 @@ type TabId = 'overview'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'te
 export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   scanId!: string;
   results = signal<ToolResult[]>([]);
+  inventory = signal<InventorySnapshot | null>(null);
+  inventoryDelta = signal<InventoryDelta | null>(null);
   loading = signal(true);
   scanStatus = signal<string>('');
   private pollHandle?: number;
@@ -36,6 +38,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   tabs = [
     {id:'overview' as TabId, label:'Overview'},
+    {id:'inventory' as TabId, label:'Inventory & Changes'},
     {id:'subdomains' as TabId, label:'Subdomains'},
     {id:'dns' as TabId, label:'DNS & Assets'},
     {id:'http' as TabId, label:'HTTP & Ports'},
@@ -61,6 +64,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     // Watch scan status so the results table can be viewed and interacted with
     // while the assessment is still running, refreshing data in place (T6).
     this.refreshStatus();
+    this.refreshInventory();
     this.pollHandle = window.setInterval(() => this.tick(), 5000);
   }
 
@@ -91,10 +95,32 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private refreshStatus() {
     this.api.getScan(this.scanId).subscribe({
-      next: scan => this.scanStatus.set(scan.status),
+      next: scan => {
+        this.scanStatus.set(scan.status);
+        if (!['running', 'pending'].includes(scan.status)) this.refreshInventory();
+      },
       error: () => {},
     });
   }
+
+  private refreshInventory() {
+    this.api.getInventory(this.scanId).subscribe({
+      next: snapshot => this.inventory.set(snapshot),
+      error: () => {},
+    });
+    this.api.getInventoryDelta(this.scanId).subscribe({
+      next: delta => this.inventoryDelta.set(delta),
+      error: () => {},
+    });
+  }
+
+  inventoryByType = computed(() => {
+    const counts = new Map<string, number>();
+    for (const asset of this.inventory()?.assets || []) {
+      counts.set(asset.type, (counts.get(asset.type) || 0) + 1);
+    }
+    return [...counts.entries()].map(([type, count]) => ({type, count}));
+  });
 
   ngAfterViewInit() { setTimeout(() => this.initCharts(), 200); }
 
@@ -260,7 +286,8 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   tabCount(t: TabId): number {
     const m: Record<TabId,number> = {
-      overview:0, subdomains:this.subdomains().length, dns:this.dnsRecords().length,
+      overview:0, inventory:this.inventory()?.assets.length || 0,
+      subdomains:this.subdomains().length, dns:this.dnsRecords().length,
       http:this.httpResults().length, vulns:this.vulns().length, wordpress:this.wpFindings().length,
       urls:this.urls().length, tech:this.techInventory().length, dorks:this.dorks().length,
       screenshots:this.screenshots().length, ai:this.aiReports().length

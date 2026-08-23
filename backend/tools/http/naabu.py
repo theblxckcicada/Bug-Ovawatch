@@ -17,9 +17,9 @@ class NaabuTool(BaseTool):
     parallel_group = "http"
 
     async def run(self, domain, out_dir, data_dir, wordlist, extra) -> RunResult:
-        alive_file = out_dir / "alive_subdomains.txt"
+        alive_file = out_dir / "probe_candidates.txt"
         if not alive_file.exists():
-            return RunResult("", "No alive_subdomains.txt", 1, 0)
+            return RunResult("", "No probe_candidates.txt", 1, 0)
         outfile = out_dir / "naabu.txt"
         return await self._exec([
             "naabu", "-silent", "-list", str(alive_file),
@@ -35,7 +35,8 @@ class NaabuTool(BaseTool):
                 try:
                     port = int(port_str)
                     rows.append({"host": host.strip(), "port": port,
-                                 "service": SERVICES.get(port, ""), "source": "naabu"})
+                                 "service": SERVICES.get(port, ""),
+                                 "state": "tcp_reachable", "source": "naabu"})
                 except ValueError:
                     pass
         return rows

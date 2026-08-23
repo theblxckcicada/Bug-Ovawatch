@@ -10,6 +10,7 @@ from models import (
     Target,
     TargetCreate,
 )
+from scope import normalize_domain
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -67,7 +68,19 @@ async def update_project(project_id: str, body: ProjectUpdate):
 
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(project_id: str):
-    await _get_storage().delete_project(project_id)
+    import process_registry
+
+    storage = _get_storage()
+    project = await storage.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    for scan in await storage.list_scans(project_id):
+        if scan.status == ScanStatus.RUNNING:
+            await process_registry.terminate_scan(scan.id)
+        await storage.delete_scan(scan.id, project_id)
+    for target in await storage.list_targets(project_id):
+        await storage.delete_target(target.id, project_id)
+    await storage.delete_project(project_id)
 
 
 @router.post("/{project_id}/clear")
@@ -108,8 +121,18 @@ async def list_targets(project_id: str):
 
 @router.post("/{project_id}/targets", status_code=201)
 async def add_target(project_id: str, body: TargetCreate):
-    t = Target(project_id=project_id, domain=body.domain, is_oos=body.is_oos)
-    await _get_storage().save_target(t)
+    storage = _get_storage()
+    if not await storage.get_project(project_id):
+        raise HTTPException(404, "Project not found")
+    try:
+        domain = normalize_domain(body.domain, allow_wildcard=body.is_oos)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    existing = await storage.list_targets(project_id)
+    if any(target.domain == domain and target.is_oos == body.is_oos for target in existing):
+        raise HTTPException(409, "Target already exists in this project")
+    t = Target(project_id=project_id, domain=domain, is_oos=body.is_oos)
+    await storage.save_target(t)
     return t
 
 

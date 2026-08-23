@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import hashlib
+import json
 import logging
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -23,6 +26,9 @@ from models import Scan, ScanProgress, ScanStatus, ToolCategory, ToolResult
 from storage import DualStorage
 from tools.registry import get_tool
 from tool_secrets import apply_tool_api_keys
+from scope import scan_workspace, scope_fingerprint
+from config import settings
+from inventory import build_inventory
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +38,15 @@ _progress_queues: dict[str, asyncio.Queue] = {}
 # scan_id → {(domain, tool): ToolResult} reused from a prior scan when resuming.
 _reuse_maps: dict[str, dict[tuple[str, str], ToolResult]] = {}
 
+# Global cap across every concurrently running assessment. This prevents several
+# scans from each launching a full phase worth of expensive network tools.
+_tool_semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_tool_groups))
+
 PHASES: list[dict[str, object]] = [
     {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap"]},
     {"index": 2, "name": "Subdomain Enumeration", "tools": ["crtsh", "assetfinder", "subfinder", "amass", "shuffledns"]},
     {"index": 3, "name": "DNS Resolution", "tools": ["dnsx", "dns_records", "zone_transfer"]},
-    {"index": 4, "name": "HTTP Probing & Port Scanning", "tools": ["httpx", "naabu"]},
+    {"index": 4, "name": "HTTP, TLS & Port Validation", "tools": ["httpx", "tlsx", "naabu"]},
     {"index": 5, "name": "URL Discovery", "tools": ["waybackurls", "gau", "katana", "urlfinder"]},
     {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "subdomain_takeover", "wpscan", "gowitness", "whatweb", "ai_analysis"]},
 ]
@@ -140,15 +150,27 @@ async def _build_reuse_map(scan: Scan, storage: DualStorage) -> dict[tuple[str, 
     earlier scan, so a resumed scan can continue instead of repeating finished work."""
     reuse: dict[tuple[str, str], ToolResult] = {}
     try:
-        prior_scans = [s for s in await storage.list_scans(scan.project_id) if s.id != scan.id]
+        prior_scans = [
+            s for s in await storage.list_scans(scan.project_id)
+            if s.id != scan.id
+            and s.status == ScanStatus.COMPLETED
+            and s.scope_hash
+            and s.scope_hash == scan.scope_hash
+        ]
         prior_scans.sort(key=lambda s: s.created_at, reverse=True)
         # Walk newest → oldest; first non-empty result for a (domain, tool) wins.
-        for prev in prior_scans:
-            for result in await storage.list_results(prev.id):
-                if result.count <= 0 or result.error:
-                    continue
-                key = (result.domain, result.tool)
-                reuse.setdefault(key, result)
+        if prior_scans:
+            previous = prior_scans[0]
+            for result in await storage.list_results(previous.id):
+                if not result.error:
+                    reuse[(result.domain, result.tool)] = result
+
+            if previous.workspace and scan.workspace:
+                output_root = Path(storage.output_dir).resolve()
+                source = (output_root / previous.workspace).resolve()
+                destination = (output_root / scan.workspace).resolve()
+                if source.exists() and output_root in source.parents:
+                    shutil.copytree(source, destination, dirs_exist_ok=True)
     except Exception:
         logger.exception("Could not build reuse map for scan %s", scan.id)
     return reuse
@@ -244,6 +266,59 @@ def _write_lines(path: Path, lines: Iterable[str]) -> None:
     path.write_text(content)
 
 
+def _file_sha256(path: Path) -> str:
+    """Hash an artifact without loading large screenshots or logs into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_execution_manifest(scan: Scan, workspace: Path, domains: list[str],
+                              oos: list[str], results: list[ToolResult]) -> Path:
+    """Write an immutable execution/evidence manifest for reproducibility."""
+    artifacts = []
+    for artifact in sorted(workspace.rglob("*")):
+        if not artifact.is_file() or artifact.name == "_manifest.json":
+            continue
+        artifacts.append({
+            "path": artifact.relative_to(workspace).as_posix(),
+            "size": artifact.stat().st_size,
+            "sha256": _file_sha256(artifact),
+        })
+
+    manifest = {
+        "schema_version": 1,
+        "scan_id": scan.id,
+        "project_id": scan.project_id,
+        "scope_hash": scan.scope_hash,
+        "domains": sorted(domains),
+        "out_of_scope": sorted(oos),
+        "selected_tools": scan.tools,
+        "wordlist": scan.wordlist,
+        "started_at": scan.started_at.isoformat() if scan.started_at else None,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "tool_results": [
+            {
+                "tool": result.tool,
+                "domain": result.domain,
+                "category": result.category.value,
+                "count": result.count,
+                "elapsed_s": result.elapsed_s,
+                "error": result.error,
+            }
+            for result in sorted(results, key=lambda item: (item.domain, item.tool))
+        ],
+        "artifacts": artifacts,
+    }
+    manifest_path = workspace / "_manifest.json"
+    temporary_path = workspace / "._manifest.json.tmp"
+    temporary_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    temporary_path.replace(manifest_path)
+    return manifest_path
+
+
 def _write_merged_subdomains(domain: str, results: list[ToolResult | None], output_dir: Path, oos: list[str]) -> tuple[Path, int]:
     """Merge all subdomain sources into a canonical unique hand-off file."""
     domain_dir = output_dir / domain
@@ -267,16 +342,22 @@ def _write_alive_subdomains(domain: str, dns_results: list[ToolResult | None], o
     """
     domain_dir = output_dir / domain
     dns_hosts = _hosts_from_results([r for r in dns_results if r and r.tool == "dnsx"])
-    hosts = _unique_sorted_hosts(dns_hosts, domain, oos)
+    resolved_hosts = _unique_sorted_hosts(dns_hosts, domain, oos)
+    candidates = list(resolved_hosts)
 
-    if not hosts:
+    if not candidates:
         merged = domain_dir / "subdomains_merged.txt"
         if merged.exists():
-            hosts = _unique_sorted_hosts(merged.read_text(errors="replace").splitlines(), domain, oos)
+            candidates = _unique_sorted_hosts(merged.read_text(errors="replace").splitlines(), domain, oos)
 
+    # Preserve the legacy hand-off name for compatible tools, but never label
+    # unresolved fallback candidates as alive. HTTP tools consume the explicit
+    # candidate file and establish reachability themselves.
     out = domain_dir / "alive_subdomains.txt"
-    _write_lines(out, hosts)
-    return out, len(hosts)
+    _write_lines(out, resolved_hosts)
+    _write_lines(domain_dir / "resolved_subdomains.txt", resolved_hosts)
+    _write_lines(domain_dir / "probe_candidates.txt", candidates)
+    return out, len(resolved_hosts)
 
 
 def _url_from_port(host: str, port: int) -> str | None:
@@ -320,13 +401,6 @@ def _write_alive_urls(domain: str, http_results: list[ToolResult | None], output
                 candidate = _url_from_port(host, port) if host and port else None
                 if candidate and not _matches_oos(candidate, oos):
                     urls.add(candidate)
-
-    if not urls:
-        alive_subdomains = domain_dir / "alive_subdomains.txt"
-        if alive_subdomains.exists():
-            for host in _unique_sorted_hosts(alive_subdomains.read_text(errors="replace").splitlines(), domain, oos):
-                urls.add(f"https://{host}")
-                urls.add(f"http://{host}")
 
     out = domain_dir / "alive_urls.txt"
     _write_lines(out, sorted(urls))
@@ -494,15 +568,16 @@ async def _run_phase(
     normal_tools = [t for t in tools if t != "ai_analysis"]
 
     if normal_tools:
-        normal_results = await asyncio.gather(*[
-            _run_tool(
+        async def run_limited(tool_name: str) -> ToolResult | None:
+            async with _tool_semaphore:
+                return await _run_tool(
                 tool_name, domain, scan, oos, output_dir, data_dir, storage, scan.wordlist,
                 phase=name, phase_index=index, completed_tools_ref=completed_ref, total_tools=len(tools),
                 overall_completed_tools_ref=overall_completed_tools_ref,
                 overall_total_tools=overall_total_tools,
             )
-            for tool_name in normal_tools
-        ])
+
+        normal_results = await asyncio.gather(*(run_limited(tool_name) for tool_name in normal_tools))
         results.extend(normal_results)
 
     for tool_name in ai_tools:
@@ -535,6 +610,11 @@ async def run_scan(
 ) -> None:
     """Main scan coroutine — called by the API background task or CLI."""
     apply_tool_api_keys(await storage.load_tool_api_keys())
+
+    workspace_root = scan_workspace(output_dir, scan.project_id, scan.id)
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    scan.workspace = str(workspace_root.relative_to(output_dir.resolve())).replace("\\", "/")
+    scan.scope_hash = scope_fingerprint(domains, oos, scan.tools, scan.wordlist)
 
     if reuse_previous:
         _reuse_maps[scan.id] = await _build_reuse_map(scan, storage)
@@ -572,7 +652,7 @@ async def run_scan(
 
                 # Hard gates: write dependent artifacts before the phase that needs them.
                 if idx == 3:
-                    merged_path, merged_count = _write_merged_subdomains(domain, phase_results.get(2, []), output_dir, oos)
+                    merged_path, merged_count = _write_merged_subdomains(domain, phase_results.get(2, []), workspace_root, oos)
                     await _emit(
                         scan, storage, "subdomain-merge", "done",
                         f"Wrote {merged_path.name}", merged_count,
@@ -581,7 +661,7 @@ async def run_scan(
                         overall_total_tools=overall_total_tools,
                     )
                 elif idx == 4:
-                    alive_path, alive_count = _write_alive_subdomains(domain, phase_results.get(3, []), output_dir, oos)
+                    alive_path, alive_count = _write_alive_subdomains(domain, phase_results.get(3, []), workspace_root, oos)
                     await _emit(
                         scan, storage, "alive-subdomains", "done",
                         f"Wrote {alive_path.name}", alive_count,
@@ -591,13 +671,13 @@ async def run_scan(
                     )
 
                 phase_results[idx] = await _run_phase(
-                    phase, domain, scan, oos, output_dir, data_dir, storage,
+                    phase, domain, scan, oos, workspace_root, data_dir, storage,
                     overall_completed_tools_ref=overall_completed_ref,
                     overall_total_tools=overall_total_tools,
                 )
 
                 if idx == 4:
-                    urls_path, urls_count = _write_alive_urls(domain, phase_results.get(4, []), output_dir, oos)
+                    urls_path, urls_count = _write_alive_urls(domain, phase_results.get(4, []), workspace_root, oos)
                     await _emit(
                         scan, storage, "alive-urls", "done",
                         f"Wrote {urls_path.name}", urls_count,
@@ -616,6 +696,22 @@ async def run_scan(
             )
 
         if scan.status != ScanStatus.CANCELLED:
+            normalized_results = await storage.list_results(scan.id)
+            snapshot = build_inventory(
+                scan_id=scan.id,
+                project_id=scan.project_id,
+                roots=domains,
+                results=normalized_results,
+            )
+            await storage.save_inventory(snapshot)
+            await asyncio.to_thread(
+                _write_execution_manifest,
+                scan,
+                workspace_root,
+                domains,
+                oos,
+                normalized_results,
+            )
             scan.status = ScanStatus.COMPLETED
 
     except Exception as exc:
@@ -642,6 +738,7 @@ async def run_scan(
     if scan.status == ScanStatus.CANCELLED:
         try:
             await storage.delete_results(scan.id)
+            await storage.delete_scan_artifacts(scan)
             scan.progress = []
             await storage.save_scan(scan)
             logger.info("Purged data for cancelled scan %s", scan.id)

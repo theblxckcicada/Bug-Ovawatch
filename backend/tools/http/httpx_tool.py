@@ -23,11 +23,11 @@ class HttpxTool(BaseTool):
 
     async def run(self, domain: str, out_dir: Path, data_dir: Path,
                   wordlist: str | None, extra: dict) -> RunResult:
-        alive_file = out_dir / "alive_subdomains.txt"
+        alive_file = out_dir / "probe_candidates.txt"
         if not alive_file.exists():
-            return RunResult("", "No alive_subdomains.txt", 1, 0)
+            return RunResult("", "No probe_candidates.txt", 1, 0)
         if not alive_file.read_text(errors="replace").strip():
-            return RunResult("", "alive_subdomains.txt is empty", 0, 0)
+            return RunResult("", "probe_candidates.txt is empty", 0, 0)
 
         outfile = out_dir / "httpx.jsonl"
         return await self._exec([
@@ -54,6 +54,7 @@ class HttpxTool(BaseTool):
                     "server": obj.get("webserver") or obj.get("web-server", ""),
                     "tech": techs if isinstance(techs, list) else [],
                     "ip": obj.get("a") or obj.get("ip", ""),
+                    "state": "http_responding",
                     "source": "httpx",
                 })
             except Exception:

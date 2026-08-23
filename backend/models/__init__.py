@@ -7,7 +7,9 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from scope import normalize_domain
 
 
 def now_utc() -> datetime:
@@ -59,8 +61,17 @@ class ResultSeverity(str, Enum):
 # ══════════════════════════════════════════════════════════
 
 class ProjectCreate(BaseModel):
-    name: str
-    description: str = ""
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=4000)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Reject whitespace-only project names."""
+        value = value.strip()
+        if not value:
+            raise ValueError("Project name cannot be empty")
+        return value
 
 
 class ProjectUpdate(BaseModel):
@@ -113,6 +124,14 @@ class TargetCreate(BaseModel):
     domain: str
     is_oos: bool = False   # True = out-of-scope
 
+    @field_validator("domain")
+    @classmethod
+    def validate_domain_shape(cls, value: str, info) -> str:
+        """Validate syntax early; wildcard authorization is finalized by the API."""
+        # Field validators run before ``is_oos`` is guaranteed to be available, so
+        # accept a leading wildcard here and enforce its meaning in add_target.
+        return normalize_domain(value, allow_wildcard=True)
+
 
 class Target(BaseModel):
     id: str = Field(default_factory=new_id)
@@ -151,7 +170,7 @@ class ScanCreate(BaseModel):
         default_factory=lambda: [
             "crtsh","assetfinder","subfinder","amass","shuffledns",
             "dnsx","dns_records","zone_transfer",
-            "httpx","naabu",
+            "httpx","tlsx","naabu",
             "nuclei","subdomain_takeover","wpscan","gowitness","whatweb",
             "waybackurls","gau","katana","urlfinder",
             "whois","asnmap",
@@ -192,6 +211,8 @@ class Scan(BaseModel):
     completed_at: Optional[datetime] = None
     progress: list[ScanProgress] = Field(default_factory=list)
     error: str = ""
+    scope_hash: str = ""
+    workspace: str = ""
 
     def to_table_entity(self) -> dict:
         import json
@@ -205,6 +226,8 @@ class Scan(BaseModel):
             "started_at": self.started_at.isoformat() if self.started_at else "",
             "completed_at": self.completed_at.isoformat() if self.completed_at else "",
             "error": self.error,
+            "scope_hash": self.scope_hash,
+            "workspace": self.workspace,
         }
 
     @staticmethod
@@ -220,6 +243,8 @@ class Scan(BaseModel):
             started_at=datetime.fromisoformat(e["started_at"]) if e.get("started_at") else None,
             completed_at=datetime.fromisoformat(e["completed_at"]) if e.get("completed_at") else None,
             error=e.get("error", ""),
+            scope_hash=e.get("scope_hash", ""),
+            workspace=e.get("workspace", ""),
         )
 
 

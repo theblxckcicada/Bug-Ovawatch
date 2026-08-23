@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Project, Target, Scan, ToolResult, ToolInfo, StorageConfig, ToolApiKeysConfig } from '../models';
+import { Project, Target, Scan, ToolResult, ToolInfo, StorageConfig, ToolApiKeysConfig, InventorySnapshot, InventoryDelta } from '../models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -73,6 +73,14 @@ export class ApiService {
   }
   getResultsSummary(scanId: string): Observable<any> {
     return this.http.get<any>(`${this.base}/results/${scanId}/summary`);
+  }
+
+  getInventory(scanId: string): Observable<InventorySnapshot> {
+    return this.http.get<InventorySnapshot>(`${this.base}/inventory/${scanId}`);
+  }
+
+  getInventoryDelta(scanId: string): Observable<InventoryDelta> {
+    return this.http.get<InventoryDelta>(`${this.base}/inventory/${scanId}/delta`);
   }
 
   // ── Tools ─────────────────────────────────────────────────────

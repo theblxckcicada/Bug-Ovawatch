@@ -16,10 +16,15 @@ def _get_storage():
     return storage
 
 
-def _safe_output_path(rel_path: str) -> Path:
+def _safe_output_path(scan, rel_path: str) -> Path:
     base = Path(settings.output_dir).resolve()
-    candidate = (base / rel_path).resolve()
-    if base not in candidate.parents and candidate != base:
+    if not scan.workspace:
+        raise HTTPException(404, "This legacy scan has no isolated artifact workspace")
+    workspace = (base / scan.workspace).resolve()
+    if base not in workspace.parents:
+        raise HTTPException(400, "Invalid scan workspace")
+    candidate = (workspace / rel_path).resolve()
+    if workspace not in candidate.parents:
         raise HTTPException(400, "Invalid artifact path")
     if not candidate.exists() or not candidate.is_file():
         raise HTTPException(404, "Artifact not found")
@@ -53,15 +58,19 @@ async def get_summary(scan_id: str):
 
 @router.get("/{scan_id}/artifact")
 async def get_artifact(scan_id: str, path: str = Query(..., min_length=1)):
-    # scan_id remains in the route so the frontend keeps artifacts scoped to a scan URL.
-    # The filesystem path is still strictly constrained to settings.output_dir.
-    artifact = _safe_output_path(path)
+    scan = await _get_storage().get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+    artifact = _safe_output_path(scan, path)
     return FileResponse(str(artifact))
 
 
 @router.get("/{scan_id}/artifact-text", response_class=PlainTextResponse)
 async def get_artifact_text(scan_id: str, path: str = Query(..., min_length=1)):
-    artifact = _safe_output_path(path)
+    scan = await _get_storage().get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+    artifact = _safe_output_path(scan, path)
     if artifact.suffix.lower() not in {".txt", ".md", ".json", ".jsonl", ".log"}:
         raise HTTPException(400, "Artifact is not a text file")
     return artifact.read_text(errors="replace")

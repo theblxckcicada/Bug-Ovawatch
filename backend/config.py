@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
-    cors_origins: str = "*"
+    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
 
     # ── Storage ─────────────────────────────────────────
     output_dir: str = "/app/output"
@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # ── Scan engine ─────────────────────────────────────
     max_concurrent_tool_groups: int = 4   # groups run in parallel
+    max_tools_per_scan: int = 40
     default_dns_wordlist: str = "/app/data/wordlists/dns.txt"
     default_resolvers:   str = "/app/data/resolvers.txt"
 

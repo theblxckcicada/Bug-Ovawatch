@@ -7,10 +7,13 @@ import asyncio
 import json
 import os
 import shutil
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
 from models import Project, Target, Scan, ToolResult
+from inventory import InventorySnapshot
 from storage.base import BaseStorage
 
 
@@ -19,6 +22,12 @@ class FileStorage(BaseStorage):
         self._base = Path(base_dir)
         self._meta = self._base / ".meta"
         self._meta.mkdir(parents=True, exist_ok=True)
+        self._write_lock = threading.RLock()
+
+    @property
+    def output_dir(self) -> str:
+        """Return the configured output root."""
+        return str(self._base)
 
     # ── helpers ────────────────────────────────────────────
     def _read(self, path: Path) -> Any:
@@ -29,8 +38,26 @@ class FileStorage(BaseStorage):
 
     def _write(self, path: Path, data: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2, default=str)
+        with self._write_lock:
+            temporary_path: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=path.parent,
+                    prefix=f".{path.name}.", suffix=".tmp", delete=False,
+                ) as temporary:
+                    json.dump(data, temporary, indent=2, default=str)
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                    temporary_path = temporary.name
+                os.replace(temporary_path, path)
+                if path.name in {"auth.json", "tool_api_keys.json", "storage_config.json"}:
+                    try:
+                        path.chmod(0o600)
+                    except OSError:
+                        pass
+            finally:
+                if temporary_path and Path(temporary_path).exists():
+                    Path(temporary_path).unlink(missing_ok=True)
 
     def _read_all(self, directory: Path) -> list[dict]:
         if not directory.exists():
@@ -95,18 +122,12 @@ class FileStorage(BaseStorage):
         path = self._meta / "scans" / project_id / f"{scan_id}.json"
         path.unlink(missing_ok=True)
         await self.delete_results(scan_id)
+        (self._meta / "inventory" / f"{scan_id}.json").unlink(missing_ok=True)
 
     # ── Results ────────────────────────────────────────────
     async def save_result(self, result: ToolResult) -> None:
         path = self._meta / "results" / result.scan_id / f"{result.id}.json"
         self._write(path, result.model_dump())
-        # Backup: append to flat output file
-        out_dir = self._base / result.domain
-        out_dir.mkdir(parents=True, exist_ok=True)
-        backup = out_dir / f"{result.tool}_output.txt"
-        with open(backup, "a") as f:
-            for row in result.data:
-                f.write(json.dumps(row) + "\n")
 
     async def list_results(self, scan_id: str) -> list[ToolResult]:
         return [ToolResult(**d) for d in self._read_all(self._meta / "results" / scan_id)]
@@ -120,6 +141,30 @@ class FileStorage(BaseStorage):
         """
         results_dir = self._meta / "results" / scan_id
         shutil.rmtree(results_dir, ignore_errors=True)
+
+    async def delete_scan_artifacts(self, scan: Scan) -> None:
+        """Delete a scan workspace after verifying it is confined and owned."""
+        if not scan.workspace:
+            return
+        base = self._base.resolve()
+        workspace = (base / scan.workspace).resolve()
+        if base not in workspace.parents or workspace == base:
+            raise ValueError("Refusing to delete an unconfined scan workspace")
+        scan_dir = workspace.parent
+        expected = (base / "projects" / scan.project_id / "scans" / scan.id).resolve()
+        if scan_dir != expected:
+            raise ValueError("Scan workspace does not match its scan identifier")
+        shutil.rmtree(scan_dir, ignore_errors=True)
+
+    async def save_inventory(self, snapshot: InventorySnapshot) -> None:
+        """Persist one immutable normalized inventory snapshot atomically."""
+        path = self._meta / "inventory" / f"{snapshot.scan_id}.json"
+        self._write(path, snapshot.model_dump())
+
+    async def load_inventory(self, scan_id: str) -> InventorySnapshot | None:
+        """Load a normalized inventory snapshot by scan identifier."""
+        data = self._read(self._meta / "inventory" / f"{scan_id}.json")
+        return InventorySnapshot(**data) if data else None
 
     # ── Config ─────────────────────────────────────────────
     async def save_storage_config(self, config: dict) -> None:

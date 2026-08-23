@@ -69,6 +69,58 @@
     }
 
     <!-- ── SUBDOMAINS ── -->
+    @if (activeTab() === 'inventory') {
+      @if (!inventory()) {
+        <div class="empty-state"><p>Normalized inventory becomes available when the assessment completes.</p></div>
+      } @else {
+        <div class="stat-grid">
+          <div class="stat-card accent"><div class="stat-label">Assets</div><div class="stat-value green">{{inventory()!.assets.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Relationships</div><div class="stat-value cyan">{{inventory()!.relationships.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Observations</div><div class="stat-value">{{inventory()!.observations.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Normalized Findings</div><div class="stat-value">{{inventory()!.findings.length}}</div></div>
+        </div>
+
+        @if (inventoryDelta(); as delta) {
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-head"><span class="section-title">Changes Since Previous Completed Assessment</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <span class="badge badge-alive">+{{delta.added_assets.length}} assets</span>
+              <span class="badge badge-dead">-{{delta.removed_assets.length}} assets</span>
+              <span class="badge badge-tool">{{delta.changed_assets.length}} changed</span>
+              <span class="badge badge-high">+{{delta.new_findings.length}} findings</span>
+              <span class="badge badge-alive">{{delta.resolved_findings.length}} resolved</span>
+            </div>
+          </div>
+        }
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-head"><span class="section-title">Asset Types</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            @for (group of inventoryByType(); track group.type) {
+              <span class="tech-pill">{{group.type}}: {{group.count}}</span>
+            }
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Type</th><th>Asset</th><th>States</th><th>Evidence Sources</th></tr></thead>
+            <tbody>
+              @for (asset of inventory()!.assets; track asset.id) {
+                <tr>
+                  <td><span class="badge badge-tool">{{asset.type}}</span></td>
+                  <td class="td-mono">{{asset.value}}</td>
+                  <td>{{asset.states.join(', ') || 'observed'}}</td>
+                  <td>{{asset.sources.join(', ')}}</td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        </div>
+      }
+    }
+
+    <!-- SUBDOMAINS -->
     @if (activeTab() === 'subdomains') {
       <div class="filter-bar">
         <div class="filter-search">

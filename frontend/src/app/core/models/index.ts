@@ -26,6 +26,8 @@ export interface Scan {
   started_at: string | null;
   completed_at: string | null;
   error: string;
+  scope_hash: string;
+  workspace: string;
 }
 
 export interface ToolInfo {
@@ -52,6 +54,66 @@ export interface ToolResult {
   elapsed_s: number;
   created_at: string;
   error: string;
+}
+
+export type AssetType = 'domain' | 'hostname' | 'ip_address' | 'url' | 'service' | 'technology';
+
+export interface InventoryAsset {
+  id: string;
+  type: AssetType;
+  value: string;
+  states: string[];
+  sources: string[];
+  attributes: Record<string, unknown>;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface AssetObservation {
+  id: string;
+  asset_id: string;
+  tool: string;
+  state: string;
+  evidence_hash: string;
+  observed_at: string;
+}
+
+export interface AssetRelationship {
+  id: string;
+  source_asset_id: string;
+  target_asset_id: string;
+  type: string;
+  sources: string[];
+}
+
+export interface InventoryFinding {
+  id: string;
+  asset_id: string;
+  tool: string;
+  title: string;
+  severity: string;
+  evidence_hash: string;
+  data: Record<string, unknown>;
+}
+
+export interface InventorySnapshot {
+  scan_id: string;
+  project_id: string;
+  created_at: string;
+  assets: InventoryAsset[];
+  observations: AssetObservation[];
+  relationships: AssetRelationship[];
+  findings: InventoryFinding[];
+}
+
+export interface InventoryDelta {
+  scan_id: string;
+  previous_scan_id: string | null;
+  added_assets: InventoryAsset[];
+  removed_assets: InventoryAsset[];
+  changed_assets: Array<{ asset: InventoryAsset; before: Record<string, unknown> }>;
+  new_findings: InventoryFinding[];
+  resolved_findings: InventoryFinding[];
 }
 
 export interface ScanProgressEvent {

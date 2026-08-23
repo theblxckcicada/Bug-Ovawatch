@@ -70,6 +70,21 @@ A modern, SaaS-style single-page app with a light/dark theme toggle (it follows 
 
 ---
 
+### Normalized inventory and change tracking
+
+Every completed assessment now correlates raw tool output into stable assets,
+observations, relationships, and findings. The **Inventory & Changes** results
+tab shows the current attack surface and compares it with the preceding completed
+assessment. The same data is available from:
+
+- `GET /api/inventory/{scan-id}`
+- `GET /api/inventory/{scan-id}/delta`
+
+Each completed scan also writes a hashed `_manifest.json` beside its evidence.
+Container readiness is exposed at `GET /api/ready`; authenticated request metrics
+are available in Prometheus text format at `GET /api/metrics`. All of these
+features are local and require no commercial account or subscription.
+
 ## First Run & Authentication
 
 ShadowGrid uses single-password auth — no default credentials ever exist. On first visit the UI forces you to set a password; every project, scan, and settings page is locked behind login. Tokens are HMAC-signed and expire after 7 days.
@@ -113,7 +128,8 @@ By default the reset rotates the token-signing secret (logging out all sessions)
 ┌────────────────▼─────────────────────────┐
 │  Storage Layer                           │
 │  ├─ File storage (always on)             │
-│  │    output/<domain>/<tool>_output.txt  │
+│  │    projects/<project>/scans/<scan>/  │
+│  │      assets/<domain>/<tool artifacts>│
 │  │    output/.meta/{projects,scans,…}    │
 │  └─ Azure Table Storage (optional)       │
 │       shadowgrid{Projects|Targets|Scans| │
@@ -132,17 +148,17 @@ The whole stack ships as a **single container** — Angular build, FastAPI backe
 | 1 — Asset Discovery | `whois`, `asnmap` | parallel |
 | 2 — Subdomain Enumeration | `crtsh`, `assetfinder`, `subfinder`, `amass`, `shuffledns` | **all parallel** |
 | 3 — DNS Resolution | `dnsx`, `dns_records`, `zone_transfer` | parallel |
-| 4 — HTTP Probing & Ports | `httpx`, `naabu` | parallel |
+| 4 — HTTP, TLS & Port Validation | `httpx`, `tlsx`, `naabu` | parallel |
 | 5 — URL Discovery | `waybackurls`, `gau`, `katana`, `urlfinder` | **all parallel** (URLs are re-probed; dead links dropped) |
 | 6 — Vuln · Takeover · WordPress · Screenshots · Dorks · AI | `nuclei`, `subdomain_takeover`, `wpscan`, `gowitness`, `whatweb`, `google_dorks`, `ai_analysis` | parallel (AI runs last) |
 
-Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_merged.txt` → `alive_subdomains.txt` → `alive_urls.txt` — so each phase feeds the next with clean, de-duplicated, in-scope input.
+Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_merged.txt` → `resolved_subdomains.txt` / `probe_candidates.txt` → `alive_urls.txt`. Unresolved fallback candidates are never presented as alive; HTTP/TLS tools validate candidates and record explicit reachability states.
 
 **Notes**
-- **Cancel deletes data:** a running assessment can be stopped from the live progress page. The backend kills in-flight tool processes **and deletes that assessment's data** (results + progress) — the run remains in history marked `cancelled`, but holds nothing until you clear it. Shared per-domain artifacts (used by other assessments of the same domain) are left intact.
+- **Cancel deletes data:** every assessment owns an isolated `projects/<project-id>/scans/<scan-id>/assets/` workspace. Cancelling kills in-flight processes and deletes that assessment's results, progress, and artifacts without affecting another run.
 - **Clear program data:** from a program's page you can wipe **all** of its assessment history — every run including cancelled ones, and their results — while keeping the program and its scope. Any still-running assessment is terminated first.
 - **Edit program details:** a program's name and description can be changed at any time after creation (`PATCH /api/projects/{id}`).
-- **Resume vs. fresh:** launching an assessment on a program that already has results lets you continue from prior results or start clean.
+- **Resume vs. fresh:** reuse is permitted only from one completed assessment with the same scope, exclusions, selected tools, and wordlist fingerprint. Its evidence snapshot is copied into the new workspace before results are reused.
 - **URL validation** — every discovered URL (waybackurls, gau, katana, urlfinder) is re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before it reaches the results. Broken/blank screenshots are likewise discarded.
 - **WordPress scanning** — `wpscan` runs only against WordPress sites, but now draws its targets from **both** signals: hosts fingerprinted as WordPress (httpx tech-detection / whatweb) **and the validated alive-URL set** — any alive URL carrying a WordPress marker (`/wp-login.php`, `/wp-content/`, `/xmlrpc.php`, `/wp-json`, …) or living on a WordPress-fingerprinted host is scanned (normalised to its site root, capped per domain). It surfaces core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
 - **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
@@ -162,6 +178,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | crt.sh | Certificate-transparency lookup (HTTP) |
 | dnsx | DNS resolution + record lookups |
 | httpx | HTTP probing + tech detection |
+| tlsx | TLS and certificate inventory, including SAN relationships |
 | naabu | Port scanning |
 | nuclei | Template-based vulnerability scanning |
 | subzy | Subdomain-takeover detection (secondary engine) |

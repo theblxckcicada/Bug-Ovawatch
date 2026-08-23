@@ -18,6 +18,7 @@ from tools.dns.dns_records       import DnsRecordsTool
 from tools.dns.zone_transfer     import ZoneTransferTool
 from tools.http.httpx_tool       import HttpxTool
 from tools.http.naabu            import NaabuTool
+from tools.http.tlsx_tool        import TlsxTool
 from tools.vuln.nuclei           import NucleiTool
 from tools.vuln.subdomain_takeover import SubdomainTakeoverTool
 from tools.vuln.wpscan           import WpscanTool
@@ -49,6 +50,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     # HTTP / Ports
     "httpx":        HttpxTool,
     "naabu":        NaabuTool,
+    "tlsx":         TlsxTool,
     # Vulnerability scanning
     "nuclei":       NucleiTool,
     "subdomain_takeover": SubdomainTakeoverTool,

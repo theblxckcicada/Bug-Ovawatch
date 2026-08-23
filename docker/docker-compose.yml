@@ -3,10 +3,10 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: shadow-grid:3.0.0
+    image: shadow-grid:3.1.0
     container_name: shadowgrid
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:8080"
     volumes:
       - shadowgrid-output:/app/output
       - shadowgrid-data:/app/data
@@ -19,11 +19,13 @@ services:
       - OUTPUT_DIR=/app/output
       - DATA_DIR=/app/data
       - PDCP_API_KEY=${PDCP_API_KEY:-}
-    cap_add:
-      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost/api/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/ready"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -4,6 +4,7 @@ main.py — FastAPI application entry point.
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from fastapi.staticfiles import StaticFiles
 from config import settings
 from storage import DualStorage
 from tool_secrets import apply_tool_api_keys
+from models import ScanStatus
+from observability import metrics_middleware, prometheus_metrics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +49,21 @@ async def lifespan(app: FastAPI):
 
     apply_tool_api_keys(await storage.load_tool_api_keys())
 
+    # Background tasks are process-local. Mark interrupted runs explicitly so a
+    # restart never leaves an assessment permanently displayed as running.
+    from datetime import datetime, timezone
+    recovered = 0
+    for project in await storage.list_projects():
+        for scan in await storage.list_scans(project.id):
+            if scan.status == ScanStatus.RUNNING:
+                scan.status = ScanStatus.FAILED
+                scan.error = "Backend restarted before the assessment completed"
+                scan.completed_at = datetime.now(timezone.utc)
+                await storage.save_scan(scan)
+                recovered += 1
+    if recovered:
+        logger.warning("Marked %d interrupted assessment(s) as failed", recovered)
+
     logger.info("ShadowGrid backend started")
     yield
     logger.info("ShadowGrid backend stopped")
@@ -53,9 +71,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ShadowGrid Recon API",
-    version="3.0.0",
+    version="3.1.0",
     lifespan=lifespan,
 )
+
+app.middleware("http")(metrics_middleware)
 
 # ── CORS ─────────────────────────────────────────────────────────
 app.add_middleware(
@@ -65,7 +85,7 @@ app.add_middleware(
         for origin in settings.cors_origins.split(",")
         if origin.strip()
     ],
-    allow_credentials=True,
+    allow_credentials="*" not in settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -79,6 +99,7 @@ from api.scans import router as scans_router
 from api.results import router as results_router
 from api.settings import router as settings_router
 from api.tools import router as tools_router
+from api.inventory import router as inventory_router
 
 # Auth endpoints are public (status/setup/login). Everything else requires a token.
 app.include_router(auth_router, prefix="/api")
@@ -89,13 +110,42 @@ for router in [
     results_router,
     settings_router,
     tools_router,
+    inventory_router,
 ]:
     app.include_router(router, prefix="/api", dependencies=[Depends(require_auth)])
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "3.0.0"}
+    return {"status": "ok", "version": "3.1.0"}
+
+
+@app.get("/api/ready")
+async def readiness():
+    """Report whether required local persistence paths are usable."""
+    output = Path(settings.output_dir)
+    data = Path(settings.data_dir)
+    checks = {
+        "output_exists": output.is_dir(),
+        "output_writable": output.is_dir() and os.access(output, os.W_OK),
+        "data_exists": data.is_dir(),
+        "data_readable": data.is_dir() and os.access(data, os.R_OK),
+    }
+    from fastapi.responses import JSONResponse
+
+    ready = all(checks.values())
+    return JSONResponse(
+        {"status": "ready" if ready else "not_ready", "checks": checks},
+        status_code=200 if ready else 503,
+    )
+
+
+@app.get("/api/metrics", dependencies=[Depends(require_auth)])
+async def metrics():
+    """Return Prometheus-compatible process metrics to authenticated callers."""
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(await prometheus_metrics(), media_type="text/plain; version=0.0.4")
 
 
 # ── Serve Angular frontend (built files) ─────────────────────────

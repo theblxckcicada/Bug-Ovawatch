@@ -18,3 +18,4 @@
 **/*[Ll]ogs/
 **/*.pyc
 **/*[Ff]rontend/dist/
+.uv-cache/

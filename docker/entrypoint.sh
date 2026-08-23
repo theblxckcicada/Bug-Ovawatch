@@ -3,13 +3,13 @@ set -e
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║         Shadow-Grid  v1.0  Startup       ║"
+echo "║         ShadowGrid  v3.1  Startup        ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
 # Tool availability check
 echo "[ Tool availability ]"
-for t in assetfinder subfinder amass shuffledns dnsx pd-httpx naabu nuclei subzy \
+for t in assetfinder subfinder amass shuffledns dnsx pd-httpx naabu tlsx nuclei subzy \
           gowitness whatweb waybackurls gau katana urlfinder asnmap massdns whois dig; do
     if command -v "$t" &>/dev/null; then
         echo "  ✓  $t"
@@ -55,7 +55,7 @@ if ! kill -0 $BACKEND_PID 2>/dev/null; then
     exit 1
 fi
 
-echo "[ Starting Nginx on :80 ]"
-echo "[ Web UI → http://localhost:8080 (mapped from container :80) ]"
+echo "[ Starting Nginx on :8080 ]"
+echo "[ Web UI → http://localhost:8080 ]"
 echo ""
 exec nginx -g "daemon off;"

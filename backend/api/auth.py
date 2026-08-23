@@ -11,6 +11,9 @@ the SSE EventSource, which cannot set headers, can authenticate).
 """
 from __future__ import annotations
 
+import time
+from collections import defaultdict, deque
+
 import auth as auth_lib
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -19,6 +22,19 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Minimum password length enforced server-side (defence in depth alongside the UI).
 MIN_PASSWORD_LENGTH = 8
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 300
+_failed_logins: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _enforce_login_rate_limit(client_ip: str) -> None:
+    """Reject repeated password guesses from one address in a rolling window."""
+    now = time.monotonic()
+    attempts = _failed_logins[client_ip]
+    while attempts and now - attempts[0] > LOGIN_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= MAX_LOGIN_ATTEMPTS:
+        raise HTTPException(429, "Too many login attempts; retry later")
 
 
 class PasswordBody(BaseModel):
@@ -81,12 +97,16 @@ async def auth_setup(body: PasswordBody):
 
 
 @router.post("/login")
-async def auth_login(body: PasswordBody):
+async def auth_login(body: PasswordBody, request: Request):
     record = await _load_record()
     if not record.get("hash"):
         raise HTTPException(409, "Password not configured yet")
 
+    client_ip = request.client.host if request.client else "unknown"
+    _enforce_login_rate_limit(client_ip)
     if not auth_lib.verify_password(body.password, record):
+        _failed_logins[client_ip].append(time.monotonic())
         raise HTTPException(401, "Invalid password")
 
+    _failed_logins.pop(client_ip, None)
     return {"token": auth_lib.issue_token(record["secret"])}
