@@ -48,20 +48,21 @@ cd /app/backend
     --host 127.0.0.1 \
     --port 8000 \
     --log-level warning &
-BACKEND_PID=$!
 
 # Wait up to 30s for backend
 echo "[ Waiting for backend... ]"
+BACKEND_READY=0
 for i in $(seq 1 30); do
     if curl -sf http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
         echo "[ Backend ready ]"
+        BACKEND_READY=1
         break
     fi
     sleep 1
 done
 
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-    echo "ERROR: Backend failed to start. Printing logs..."
+if [ "$BACKEND_READY" -ne 1 ]; then
+    echo "ERROR: Backend failed its startup health check."
     exit 1
 fi
 
