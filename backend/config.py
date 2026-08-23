@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
-    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
+    # The UI uses bearer tokens rather than cookie credentials. A wildcard
+    # permits VM, LAN, and reverse-proxy addresses by default. Public deployments
+    # should set CORS_ORIGINS to a comma-separated allowlist.
+    cors_origins: str = "*"
 
     # ── Storage ─────────────────────────────────────────
     output_dir: str = "/app/output"

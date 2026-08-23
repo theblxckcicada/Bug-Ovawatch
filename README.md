@@ -85,6 +85,15 @@ Container readiness is exposed at `GET /api/ready`; authenticated request metric
 are available in Prometheus text format at `GET /api/metrics`. All of these
 features are local and require no commercial account or subscription.
 
+### Accessing ShadowGrid from a VM host
+
+When Docker runs inside a VM, open `http://<vm-ip>:8080` from the host. Compose
+binds port 8080 on all VM interfaces by default. Use
+`SHADOWGRID_BIND_ADDRESS=127.0.0.1` if you intentionally want VM-local access
+only. For an internet-facing deployment, set `CORS_ORIGINS` to an explicit,
+comma-separated origin allowlist and place TLS authentication or a private VPN
+in front of ShadowGrid.
+
 ## First Run & Authentication
 
 ShadowGrid uses single-password auth — no default credentials ever exist. On first visit the UI forces you to set a password; every project, scan, and settings page is locked behind login. Tokens are HMAC-signed and expire after 7 days.

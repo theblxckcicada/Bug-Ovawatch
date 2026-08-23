@@ -2,11 +2,15 @@
 
 ## Safe deployment defaults
 
-- Docker publishes the UI only on `127.0.0.1:8080`.
+- Docker publishes the UI on port `8080` so it is reachable across a VM/LAN.
+  Set `SHADOWGRID_BIND_ADDRESS=127.0.0.1` to restore VM-local binding.
 - The runtime runs as `www-data`, drops all Linux capabilities, and enables
   `no-new-privileges`.
 - Put a TLS reverse proxy or private VPN in front of ShadowGrid before allowing
   remote access.
+- CORS defaults to `*` because authentication uses explicit bearer tokens, not
+  browser cookies. Set `CORS_ORIGINS` to a comma-separated origin allowlist when
+  deploying beyond a trusted VM or LAN.
 - Storage credentials and tool API keys are local control-plane secrets and are
   not mirrored to Azure Table Storage.
 - Provider API keys remain optional. Every included scanner is open source;
