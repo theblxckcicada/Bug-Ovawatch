@@ -128,6 +128,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpcap0.8 \
     libpcap-dev \
     procps \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # WhatWeb (Ruby gem)
@@ -166,7 +167,9 @@ RUN chmod +x /entrypoint.sh \
     && usermod -d /app/runtime-home www-data \
     && chown -R www-data:www-data /app/output /app/data /app/runtime-home /var/cache/nginx /var/lib/nginx /var/log/nginx /run
 
-USER www-data
+# The entrypoint starts as root only long enough to repair ownership on mounted
+# persistent volumes, then permanently drops to www-data for backend and nginx.
+USER root
 
 EXPOSE 8080
 

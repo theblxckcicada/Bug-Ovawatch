@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Named volumes may have been created by an older root-running release. Image
+# ownership does not apply after Docker mounts those volumes, so migrate them on
+# every startup before dropping privileges. This operation is idempotent.
+if [ "$(id -u)" -eq 0 ]; then
+    chown -R www-data:www-data /app/output /app/data
+    RUN_AS=(gosu www-data)
+else
+    RUN_AS=()
+fi
+
 echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║         ShadowGrid  v3.1  Startup        ║"
@@ -28,13 +38,13 @@ echo ""
 # Fetch nuclei templates in background (non-blocking, best-effort)
 if command -v nuclei &>/dev/null; then
     echo "[ Updating nuclei templates in background ]"
-    nuclei -update-templates -silent &>/dev/null &
+    "${RUN_AS[@]}" nuclei -update-templates -silent &>/dev/null &
 fi
 
 # Start FastAPI backend
 echo "[ Starting backend on :8000 ]"
 cd /app/backend
-python3 -m uvicorn main:app \
+"${RUN_AS[@]}" python3 -m uvicorn main:app \
     --host 127.0.0.1 \
     --port 8000 \
     --log-level warning &
@@ -58,4 +68,4 @@ fi
 echo "[ Starting Nginx on :8080 ]"
 echo "[ Web UI → http://localhost:8080 ]"
 echo ""
-exec nginx -g "daemon off;"
+exec "${RUN_AS[@]}" nginx -g "daemon off;"
