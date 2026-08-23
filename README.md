@@ -28,7 +28,8 @@ It's built for **security teams, penetration testers, and bug-bounty hunters** w
 
 ### Why ShadowGrid
 
-- **A platform, not a script** — a posture **Dashboard**, a cross-program **Scan Activity** board, per-program **Assessments**, and a multi-tab findings view, all in a light/dark SaaS UI.
+- **A platform, not a script** — a posture **Dashboard**, global **Assets**,
+  **Findings**, and **Changes**, plus cross-program **Assessments** in a light/dark SaaS UI.
 - **One pipeline, many tools** — subfinder, amass, httpx, naabu, nuclei, katana, wpscan, gowitness and more, coordinated so each phase hands clean artifacts to the next.
 - **Phase gating** — a phase never starts until the previous one has fully drained and written its hand-off files (e.g. merged subdomains → alive hosts → alive URLs), so downstream tools always get real input.
 - **Validated data** — discovered URLs are re-probed and dead links dropped before they reach results; WordPress scanning is driven off the validated alive-URL set.
@@ -65,16 +66,24 @@ A modern, SaaS-style single-page app with a light/dark theme toggle (it follows 
 
 - **Dashboard** — security-posture overview: programs, active assessments, completed assessments, and a recent-activity feed.
 - **Programs** — create/manage application-security programs; each card shows its assessment count. Inside a program you can **edit its name/description**, define **scope**, launch a **new assessment**, review the **assessments** history, and **clear all program data** (a guarded action that removes every assessment — including cancelled ones — and their results, while keeping the program and its scope).
-- **Scan Activity** — a cross-program board of running and recent assessments as clean status cards, so scanning many domains at once stays readable instead of stacking into one long list.
+- **Assets** — a normalized inventory across every program. Select an asset to
+  inspect its states, observations, relationships, findings, and originating evidence.
+- **Findings** — a severity-prioritized portfolio queue linked to affected assets,
+  programs, and assessment evidence.
+- **Changes** — cross-program drift showing new, removed, and changed assets
+  alongside new and resolved findings.
+- **Assessments** — a cross-program board of running and recent assessments as clean status cards, so scanning many domains at once stays readable instead of stacking into one long list.
 - **Live progress** — per-assessment view that groups tools into a card **per domain**, each with its own progress bar; cancel from here, or jump straight to the results collected **so far**.
-- **Results** — multi-tab findings (subdomains, DNS, HTTP/ports, vulns, WordPress, URLs, tech, dorks, screenshots, AI). The table is fully interactive — **sort/filter/paginate while the assessment is still running**, and it refreshes in place without losing your place.
+- **Results** — an asset-centric workspace organized into Overview, Assets,
+  Findings, Changes, Evidence, and Assessment. Raw DNS, HTTP, URL, WordPress,
+  screenshot, technology, dork, and AI records remain in the Evidence explorer.
 
 ---
 
 ### Normalized inventory and change tracking
 
 Every completed assessment now correlates raw tool output into stable assets,
-observations, relationships, and findings. The **Inventory & Changes** results
+observations, relationships, and findings. The **Assets** and **Changes** results
 tab shows the current attack surface and compares it with the preceding completed
 assessment. The same data is available from:
 

@@ -74,6 +74,12 @@ const TOOL_GROUPS: Record<string, string[]> = {
 
         @if (message()) { <div class="alert alert-success">{{message()}}</div> }
 
+        <div class="project-shortcuts" aria-label="Program intelligence">
+          <a class="shortcut" routerLink="/assets" [queryParams]="{project:p.id}"><span>Assets</span><b>Inventory →</b></a>
+          <a class="shortcut" routerLink="/findings" [queryParams]="{project:p.id}"><span>Findings</span><b>Prioritized risk →</b></a>
+          <a class="shortcut" routerLink="/changes" [queryParams]="{project:p.id}"><span>Changes</span><b>Exposure drift →</b></a>
+        </div>
+
         <!-- Tabs -->
         <div class="tab-bar">
           <button class="tab-btn" [class.active]="tab==='targets'" (click)="tab='targets'">Scope</button>
@@ -263,6 +269,12 @@ const TOOL_GROUPS: Record<string, string[]> = {
     </div>
   `,
   styles: [`
+    .project-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 0 18px; }
+    .shortcut { display:flex; flex-direction:column; gap:2px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text); }
+    .shortcut:hover { border-color:var(--accent); }
+    .shortcut span { font-weight:650; }
+    .shortcut b { font-size:10px; color:var(--text-dim); font-weight:500; }
+    @media(max-width:700px){.project-shortcuts{grid-template-columns:1fr}}
     .page { padding:32px; max-width:1200px; margin:0 auto; }
     .breadcrumb { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); margin-bottom:20px; }
     .breadcrumb a { color:var(--accent); }

@@ -69,6 +69,48 @@
     }
 
     <!-- ── SUBDOMAINS ── -->
+    @if (activeTab() === 'changes') {
+      @if (inventoryDelta(); as delta) {
+        <div class="stat-grid">
+          <div class="stat-card accent"><div class="stat-label">New assets</div><div class="stat-value green">{{delta.added_assets.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Removed assets</div><div class="stat-value">{{delta.removed_assets.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Changed assets</div><div class="stat-value cyan">{{delta.changed_assets.length}}</div></div>
+          <div class="stat-card" [class.danger]="delta.new_findings.length > 0"><div class="stat-label">New findings</div><div class="stat-value" [class.red]="delta.new_findings.length > 0">{{delta.new_findings.length}}</div></div>
+          <div class="stat-card"><div class="stat-label">Resolved findings</div><div class="stat-value green">{{delta.resolved_findings.length}}</div></div>
+        </div>
+        <div class="card">
+          <div class="section-head"><span class="section-title">Drift since previous assessment</span></div>
+          @if (!delta.previous_scan_id) { <div class="empty-state"><h3>Baseline established</h3><p>Run another assessment to detect additions, removals, and resolved risk.</p></div> }
+          @for (asset of delta.added_assets; track asset.id) { <div class="top-finding"><span class="badge badge-alive">New asset</span><span class="tf-name td-mono">{{asset.value}}</span><span class="tf-host">{{asset.type}}</span></div> }
+          @for (finding of delta.new_findings; track finding.id) { <div class="top-finding"><span class="badge badge-{{finding.severity}}">{{finding.severity}}</span><span class="tf-name">{{finding.title}}</span><span class="tf-host">new finding</span></div> }
+          @for (finding of delta.resolved_findings; track finding.id) { <div class="top-finding"><span class="badge badge-alive">Resolved</span><span class="tf-name">{{finding.title}}</span></div> }
+        </div>
+      } @else { <div class="empty-state"><p>Change data becomes available after the assessment completes.</p></div> }
+    }
+
+    @if (activeTab() === 'evidence') {
+      <div class="card">
+        <div class="section-head"><div><span class="section-title">Raw evidence explorer</span><p class="page-sub">Open tool-oriented records when you need to validate normalized assets and findings.</p></div></div>
+        <div class="evidence-grid">
+          @for (tab of evidenceTabs; track tab.id) {
+            <button class="evidence-link" (click)="setTab(tab.id)"><span>{{tab.label}}</span><b>{{tabCount(tab.id)}}</b></button>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activeTab() === 'assessment') {
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Assessment status</div><div class="stat-value status-text">{{scanStatus()}}</div></div>
+        <div class="stat-card"><div class="stat-label">Tools reporting</div><div class="stat-value cyan">{{results().length}}</div></div>
+        <div class="stat-card"><div class="stat-label">Tool errors</div><div class="stat-value" [class.red]="toolErrors() > 0">{{toolErrors()}}</div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden"><div class="table-wrap"><table>
+        <thead><tr><th>Tool</th><th>Domain</th><th>Category</th><th>Records</th><th>Duration</th><th>Outcome</th></tr></thead>
+        <tbody>@for (result of results(); track result.id) { <tr><td><span class="badge badge-tool">{{result.tool}}</span></td><td class="td-mono">{{result.domain}}</td><td>{{result.category}}</td><td>{{result.count}}</td><td>{{result.elapsed_s | number:'1.1-1'}}s</td><td><span class="badge" [class]="result.error ? 'badge-error' : 'badge-completed'">{{result.error ? result.error : (result.count ? 'Evidence collected' : 'No findings')}}</span></td></tr> }</tbody>
+      </table></div></div>
+    }
+
     @if (activeTab() === 'inventory') {
       @if (!inventory()) {
         <div class="empty-state"><p>Normalized inventory becomes available when the assessment completes.</p></div>

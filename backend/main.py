@@ -89,6 +89,7 @@ from api.results import router as results_router
 from api.settings import router as settings_router
 from api.tools import router as tools_router
 from api.inventory import router as inventory_router
+from api.portfolio import router as portfolio_router
 
 # Auth endpoints are public (status/setup/login). Everything else requires a token.
 app.include_router(auth_router, prefix="/api")
@@ -100,6 +101,7 @@ for router in [
     settings_router,
     tools_router,
     inventory_router,
+    portfolio_router,
 ]:
     app.include_router(router, prefix="/api", dependencies=[Depends(require_auth)])
 

@@ -14,7 +14,7 @@ const RUNNING = new Set(['running', 'pending']);
 
 /**
  * Aggregates scans across every program into a single, chronologically-ordered
- * activity feed. This powers the dashboard posture tiles and the Scan Activity
+ * activity feed. This powers the dashboard posture tiles and the Assessments
  * page, replacing the old per-domain stacking with one cohesive view.
  */
 @Injectable({ providedIn: 'root' })

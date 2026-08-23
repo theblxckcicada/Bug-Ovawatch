@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy, signal, computed, inject } from '@angular
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ScanActivityService, ActivityEntry } from '../../core/services/scan-activity.service';
+import { ApiService } from '../../core/services/api.service';
+import { PortfolioResponse } from '../../core/models';
 
 /**
  * Security-posture overview. Aggregates programs and their assessments into a
@@ -42,9 +44,14 @@ import { ScanActivityService, ActivityEntry } from '../../core/services/scan-act
             <div class="stat-sub">finished assessments</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Total assessments</div>
-            <div class="stat-value">{{entries().length}}</div>
-            <div class="stat-sub">across every program</div>
+            <div class="stat-label">Known assets</div>
+            <div class="stat-value">{{portfolio()?.summary?.assets || 0}}</div>
+            <div class="stat-sub"><a routerLink="/assets">open inventory</a></div>
+          </div>
+          <div class="stat-card" [class.danger]="(portfolio()?.summary?.critical_high || 0) > 0">
+            <div class="stat-label">Critical / high</div>
+            <div class="stat-value" [class.red]="(portfolio()?.summary?.critical_high || 0) > 0">{{portfolio()?.summary?.critical_high || 0}}</div>
+            <div class="stat-sub"><a routerLink="/findings">review findings</a></div>
           </div>
         </div>
 
@@ -93,9 +100,11 @@ import { ScanActivityService, ActivityEntry } from '../../core/services/scan-act
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private activityService = inject(ScanActivityService);
+  private api = inject(ApiService);
 
   entries = signal<ActivityEntry[]>([]);
   loading = signal(true);
+  portfolio = signal<PortfolioResponse | null>(null);
   private timer?: number;
 
   programs = computed(() => new Set(this.entries().map(e => e.project.id)).size);
@@ -117,6 +126,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       next: entries => { this.entries.set(entries); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+    this.api.getPortfolio().subscribe({ next: portfolio => this.portfolio.set(portfolio), error: () => {} });
   }
 
   rowLink(e: ActivityEntry): any[] {

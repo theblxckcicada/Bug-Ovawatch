@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Project, Target, Scan, ToolResult, ToolInfo, ToolApiKeysConfig, InventorySnapshot, InventoryDelta } from '../models';
+import { Project, Target, Scan, ToolResult, ToolInfo, ToolApiKeysConfig, InventorySnapshot, InventoryDelta, PortfolioResponse, SystemStatus } from '../models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -81,6 +81,14 @@ export class ApiService {
 
   getInventoryDelta(scanId: string): Observable<InventoryDelta> {
     return this.http.get<InventoryDelta>(`${this.base}/inventory/${scanId}/delta`);
+  }
+
+  getPortfolio(): Observable<PortfolioResponse> {
+    return this.http.get<PortfolioResponse>(`${this.base}/portfolio`);
+  }
+
+  getSystemStatus(): Observable<SystemStatus> {
+    return this.http.get<SystemStatus>(`${this.base}/portfolio/system`);
   }
 
   // ── Tools ─────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ import { ScanActivityService, ActivityEntry } from '../../core/services/scan-act
     <div class="page">
       <div class="page-header">
         <div>
-          <h1 class="page-title">Scan Activity</h1>
+          <h1 class="page-title">Assessments</h1>
           <p class="page-sub">Live and recent security assessments across every program</p>
         </div>
         <button class="btn btn-outline btn-sm" (click)="load()">

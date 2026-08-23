@@ -116,6 +116,46 @@ export interface InventoryDelta {
   resolved_findings: InventoryFinding[];
 }
 
+export interface PortfolioAsset extends InventoryAsset {
+  project_id: string;
+  project_name: string;
+  scan_id: string;
+  finding_count: number;
+  findings: InventoryFinding[];
+  observations: AssetObservation[];
+  relationships: Array<AssetRelationship & { source_value: string; target_value: string }>;
+}
+
+export interface PortfolioFinding extends InventoryFinding {
+  project_id: string;
+  project_name: string;
+  scan_id: string;
+  asset_value: string;
+}
+
+export interface PortfolioResponse {
+  assets: PortfolioAsset[];
+  findings: PortfolioFinding[];
+  changes: Array<InventoryDelta & { project_id: string; project_name: string; created_at: string }>;
+  summary: {
+    projects: number;
+    programs_with_inventory: number;
+    assets: number;
+    findings: number;
+    critical_high: number;
+  };
+}
+
+export interface SystemStatus {
+  database: string;
+  database_size: number;
+  output_free: number;
+  output_total: number;
+  tools_available: number;
+  tools_total: number;
+  tools: Array<{ name: string; available: boolean; reason: string }>;
+}
+
 export interface ScanProgressEvent {
   tool: string;
   status: 'running' | 'done' | 'error' | 'skipped' | 'start' | 'completed' | 'failed' | 'cancelled';

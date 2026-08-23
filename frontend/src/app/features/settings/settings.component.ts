@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
-import { ToolApiKeysConfig } from '../../core/models';
+import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
 
 @Component({
   selector: 'sg-settings',
@@ -118,6 +118,21 @@ import { ToolApiKeysConfig } from '../../core/models';
       </div>
 
       <div class="card" style="max-width:960px;margin-top:16px">
+        <h3 class="section-title">System Health</h3>
+        <p class="section-copy">Local database, storage capacity, and scanner readiness.</p>
+        @if (system(); as status) {
+          <div class="health-grid">
+            <div class="health-item"><span>Database</span><b class="mono">SQLite · {{formatBytes(status.database_size)}}</b></div>
+            <div class="health-item"><span>Free evidence storage</span><b>{{formatBytes(status.output_free)}}</b></div>
+            <div class="health-item"><span>Scanner coverage</span><b>{{status.tools_available}} / {{status.tools_total}}</b></div>
+          </div>
+          @if (missingTools().length) {
+            <details><summary>{{missingTools().length}} unavailable scanners</summary><div class="tool-health">@for (tool of missingTools(); track tool.name) { <div><span class="badge badge-error">{{tool.name}}</span><span>{{tool.reason}}</span></div> }</div></details>
+          }
+        } @else { <div class="empty-state" style="padding:20px"><div class="spinner-sm"></div><span>Checking system health…</span></div> }
+      </div>
+
+      <div class="card" style="max-width:960px;margin-top:16px">
         <h3 class="section-title" style="margin-bottom:16px">About</h3>
         <div class="about-row"><span>Version</span><span class="mono">3.0.0</span></div>
         <div class="about-row"><span>Primary Storage</span><span class="mono">SQLite (mandatory)</span></div>
@@ -141,10 +156,17 @@ import { ToolApiKeysConfig } from '../../core/models';
     .two-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
     .about-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
     .about-row:last-child { border-bottom:none; }
+    .health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .health-item { padding:12px; border-radius:var(--radius); background:var(--bg-elevated); display:flex; flex-direction:column; gap:3px; }
+    .health-item span { font-size:11px; color:var(--text-dim); }
+    details summary { cursor:pointer; color:var(--text-dim); font-size:12px; }
+    .tool-health { display:grid; gap:7px; margin-top:10px; }
+    .tool-health div { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-dim); }
     @media (max-width: 900px) { .settings-grid, .two-col { grid-template-columns:1fr; } .ai-card { max-width:none; } }
   `]
 })
 export class SettingsComponent implements OnInit {
+  system = signal<SystemStatus | null>(null);
   apiKeys: ToolApiKeysConfig = {
     pdcp_api_key:'', github_token:'', shodan_api_key:'', censys_api_id:'', censys_api_secret:'', chaos_key:'',
     wpscan_api_token:'', google_cse_api_key:'', google_cse_cx:'',
@@ -159,7 +181,11 @@ export class SettingsComponent implements OnInit {
 
   ngOnInit() {
     this.api.getToolApiKeys().subscribe(c => { this.apiKeys = { ...this.apiKeys, ...c }; });
+    this.api.getSystemStatus().subscribe({ next: status => this.system.set(status), error: () => {} });
   }
+
+  missingTools() { return this.system()?.tools.filter(tool => !tool.available) || []; }
+  formatBytes(value: number): string { const units=['B','KB','MB','GB','TB']; let size=value,index=0; while(size>=1024&&index<units.length-1){size/=1024;index++;} return `${size.toFixed(index ? 1 : 0)} ${units[index]}`; }
 
   saveApiKeys() {
     this.keysSaving.set(true); this.keysSaved.set(false); this.keysError.set('');

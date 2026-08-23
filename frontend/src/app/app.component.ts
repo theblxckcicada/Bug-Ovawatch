@@ -29,9 +29,21 @@ import { ThemeService } from "./core/services/theme.service";
               <svg viewBox="0 0 24 24" class="nav-ico"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
               <span>Programs</span>
             </a>
+            <a class="nav-link" routerLink="/assets" routerLinkActive="active">
+              <svg viewBox="0 0 24 24" class="nav-ico"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg>
+              <span>Assets</span>
+            </a>
+            <a class="nav-link" routerLink="/findings" routerLinkActive="active">
+              <svg viewBox="0 0 24 24" class="nav-ico"><path d="M12 3l9 17H3z"/><path d="M12 9v5M12 17h.01"/></svg>
+              <span>Findings</span>
+            </a>
+            <a class="nav-link" routerLink="/changes" routerLinkActive="active">
+              <svg viewBox="0 0 24 24" class="nav-ico"><path d="M4 7h11M12 4l3 3-3 3M20 17H9M12 14l-3 3 3 3"/></svg>
+              <span>Changes</span>
+            </a>
             <a class="nav-link" routerLink="/activity" routerLinkActive="active">
               <svg viewBox="0 0 24 24" class="nav-ico"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
-              <span>Scan Activity</span>
+              <span>Assessments</span>
             </a>
             <a class="nav-link" routerLink="/settings" routerLinkActive="active">
               <svg viewBox="0 0 24 24" class="nav-ico"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>

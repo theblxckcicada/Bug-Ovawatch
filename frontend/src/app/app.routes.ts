@@ -25,6 +25,24 @@ export const routes: Routes = [
     loadComponent: () => import('./features/activity/activity.component').then(m => m.ActivityComponent),
   },
   {
+    path: 'assets',
+    canActivate: [authGuard],
+    data: { mode: 'assets' },
+    loadComponent: () => import('./features/portfolio/portfolio.component').then(m => m.PortfolioComponent),
+  },
+  {
+    path: 'findings',
+    canActivate: [authGuard],
+    data: { mode: 'findings' },
+    loadComponent: () => import('./features/portfolio/portfolio.component').then(m => m.PortfolioComponent),
+  },
+  {
+    path: 'changes',
+    canActivate: [authGuard],
+    data: { mode: 'changes' },
+    loadComponent: () => import('./features/portfolio/portfolio.component').then(m => m.PortfolioComponent),
+  },
+  {
     path: 'projects',
     canActivate: [authGuard],
     loadComponent: () => import('./features/projects/projects.component').then(m => m.ProjectsComponent),

@@ -6,7 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { InventoryDelta, InventorySnapshot, ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'inventory'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'inventory'|'changes'|'evidence'|'assessment'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -38,17 +38,16 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   tabs = [
     {id:'overview' as TabId, label:'Overview'},
-    {id:'inventory' as TabId, label:'Inventory & Changes'},
-    {id:'subdomains' as TabId, label:'Subdomains'},
-    {id:'dns' as TabId, label:'DNS & Assets'},
-    {id:'http' as TabId, label:'HTTP & Ports'},
-    {id:'vulns' as TabId, label:'Vulns'},
-    {id:'wordpress' as TabId, label:'WordPress'},
-    {id:'urls' as TabId, label:'URLs'},
-    {id:'tech' as TabId, label:'Tech Stack'},
-    {id:'dorks' as TabId, label:'Dorks'},
-    {id:'screenshots' as TabId, label:'Screenshots'},
-    {id:'ai' as TabId, label:'AI Analysis'},
+    {id:'inventory' as TabId, label:'Assets'},
+    {id:'vulns' as TabId, label:'Findings'},
+    {id:'changes' as TabId, label:'Changes'},
+    {id:'evidence' as TabId, label:'Evidence'},
+    {id:'assessment' as TabId, label:'Assessment'},
+  ];
+  evidenceTabs: Array<{id: TabId; label: string}> = [
+    {id:'subdomains',label:'Subdomains'}, {id:'dns',label:'DNS'}, {id:'http',label:'HTTP & Ports'},
+    {id:'wordpress',label:'WordPress'}, {id:'urls',label:'URLs'}, {id:'tech',label:'Technology'},
+    {id:'dorks',label:'Dorks'}, {id:'screenshots',label:'Screenshots'}, {id:'ai',label:'AI analysis'},
   ];
   severities = ['all','critical','high','medium','low','info'];
   COMMON_PORTS = new Set([80,443,8080,8443,22,21,25,3389,3306,5432,6379,27017]);
@@ -164,6 +163,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   whoisData    = computed(() => { const d = this.byTool('whois')[0]; return d ? d['whois'] : 'No WHOIS data'; });
   asnRanges    = computed(() => this.byTool('asnmap'));
   httpResults  = computed(() => this.byTool('httpx'));
+  toolErrors = computed(() => this.results().filter(result => !!result.error).length);
 
   techInventory = computed(() => {
     const map = new Map<string, Set<string>>();
@@ -287,6 +287,8 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   tabCount(t: TabId): number {
     const m: Record<TabId,number> = {
       overview:0, inventory:this.inventory()?.assets.length || 0,
+      changes:(this.inventoryDelta()?.added_assets.length || 0) + (this.inventoryDelta()?.new_findings.length || 0),
+      evidence:this.results().reduce((sum,result)=>sum+result.count,0), assessment:this.results().length,
       subdomains:this.subdomains().length, dns:this.dnsRecords().length,
       http:this.httpResults().length, vulns:this.vulns().length, wordpress:this.wpFindings().length,
       urls:this.urls().length, tech:this.techInventory().length, dorks:this.dorks().length,
