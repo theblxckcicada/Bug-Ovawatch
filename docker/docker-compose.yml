@@ -23,6 +23,8 @@ services:
       - CHOWN
       - DAC_OVERRIDE
       - FOWNER
+      - SETGID
+      - SETUID
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/api/ready"]
