@@ -25,6 +25,7 @@ class NucleiTool(BaseTool):
         outfile = out_dir / "nuclei_results.jsonl"
         result = await self._exec([
             "nuclei", "-list", str(alive_file),
+            "-exclude-tags", "cve",
             "-severity", "low,medium,high,critical",
             "-jsonl", "-o", str(outfile), "-silent",
         ], timeout=3600)
@@ -33,6 +34,7 @@ class NucleiTool(BaseTool):
         if result.returncode != 0 and "unknown flag" in (result.stderr or "").lower():
             result = await self._exec([
                 "nuclei", "-list", str(alive_file),
+                "-exclude-tags", "cve",
                 "-severity", "low,medium,high,critical",
                 "-json", "-o", str(outfile), "-silent",
             ], timeout=3600)

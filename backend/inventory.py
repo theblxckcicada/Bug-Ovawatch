@@ -243,6 +243,7 @@ def build_inventory(scan_id: str, project_id: str, roots: Iterable[str],
                     relate(url_asset, url_host_asset, "served_by", result.tool)
                     host_asset = host_asset or url_host_asset
 
+            service_asset = None
             port = row.get("port")
             if host_asset and port not in (None, ""):
                 try:
@@ -250,12 +251,12 @@ def build_inventory(scan_id: str, project_id: str, roots: Iterable[str],
                 except (TypeError, ValueError):
                     port_number = 0
                 if 1 <= port_number <= 65535:
-                    service = upsert_asset(
+                    service_asset = upsert_asset(
                         AssetType.SERVICE, f"{host_asset.value}:{port_number}", result.tool, state,
                         {"port": port_number, "service": row.get("service", "")},
                     )
-                    observe(service, result.tool, state, row)
-                    relate(service, host_asset, "runs_on", result.tool)
+                    observe(service_asset, result.tool, state, row)
+                    relate(service_asset, host_asset, "runs_on", result.tool)
 
             technologies = row.get("tech") or row.get("technologies") or []
             if isinstance(technologies, str):
@@ -267,6 +268,26 @@ def build_inventory(scan_id: str, project_id: str, roots: Iterable[str],
                         continue
                     tech_asset = upsert_asset(AssetType.TECHNOLOGY, name, result.tool, "detected")
                     relate(host_asset, tech_asset, "uses_technology", result.tool)
+
+            reported_vulnerabilities = row.get("vulnerabilities") or []
+            if isinstance(reported_vulnerabilities, str):
+                reported_vulnerabilities = [reported_vulnerabilities]
+            if isinstance(reported_vulnerabilities, list):
+                affected = service_asset or host_asset or root_asset
+                for vulnerability in reported_vulnerabilities:
+                    cve = str(vulnerability).strip().upper()
+                    if not affected or not cve:
+                        continue
+                    finding_id = _stable_id("finding", affected.id, result.tool, cve)
+                    findings[finding_id] = InventoryFinding(
+                        id=finding_id,
+                        asset_id=affected.id,
+                        tool=result.tool,
+                        title=f"Shodan reported {cve}",
+                        severity="unknown",
+                        evidence_hash=_evidence_hash(row),
+                        data={"cve": cve, "source": "shodan", "service": row},
+                    )
 
             if result.category in {ToolCategory.VULN, ToolCategory.WORDPRESS}:
                 affected = url_asset or host_asset or root_asset

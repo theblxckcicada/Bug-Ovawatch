@@ -31,7 +31,8 @@ import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
 
           <div class="form-group">
             <label class="form-label">Shodan API Key</label>
-            <input class="form-input" type="password" [(ngModel)]="apiKeys.shodan_api_key" placeholder="Optional future provider key" />
+            <input class="form-input" type="password" [(ngModel)]="apiKeys.shodan_api_key" placeholder="Enables selectable Shodan enrichment" />
+            <span class="hint">The Shodan tool runs only when selected for an assessment. Filtered searches may consume Shodan query credits.</span>
           </div>
 
           <div class="two-col">

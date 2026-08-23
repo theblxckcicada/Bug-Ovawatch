@@ -20,6 +20,7 @@ from tools.http.httpx_tool       import HttpxTool
 from tools.http.naabu            import NaabuTool
 from tools.http.tlsx_tool        import TlsxTool
 from tools.vuln.nuclei           import NucleiTool
+from tools.vuln.cve_check        import CveCheckTool
 from tools.vuln.subdomain_takeover import SubdomainTakeoverTool
 from tools.vuln.wpscan           import WpscanTool
 from tools.screenshots.gowitness import GowitnessTool
@@ -30,6 +31,7 @@ from tools.urls.katana           import KatanaTool
 from tools.urls.urlfinder        import UrlFinderTool
 from tools.asset.whois_tool      import WhoisTool
 from tools.asset.asnmap_tool     import AsnmapTool
+from tools.asset.shodan_tool     import ShodanTool
 from tools.analysis.google_dorks  import GoogleDorksTool
 from tools.analysis.ai_analysis   import AIAnalysisTool
 
@@ -53,6 +55,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     "tlsx":         TlsxTool,
     # Vulnerability scanning
     "nuclei":       NucleiTool,
+    "cve_check":    CveCheckTool,
     "subdomain_takeover": SubdomainTakeoverTool,
     "wpscan":       WpscanTool,
     # Screenshots & Tech
@@ -66,6 +69,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     # Asset discovery (parallel group "asset")
     "whois":        WhoisTool,
     "asnmap":       AsnmapTool,
+    "shodan":       ShodanTool,
     "google_dorks": GoogleDorksTool,
     "ai_analysis":  AIAnalysisTool,
 }

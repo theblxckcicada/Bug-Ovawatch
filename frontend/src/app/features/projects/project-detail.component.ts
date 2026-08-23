@@ -9,7 +9,7 @@ import { Project, Target, Scan, ToolInfo } from '../../core/models';
 const DEFAULT_TOOLS = [
   'crtsh','assetfinder','subfinder','amass','shuffledns',
   'dnsx','dns_records','zone_transfer',
-  'httpx','naabu','nuclei','subdomain_takeover','wpscan','gowitness','whatweb',
+  'httpx','naabu','nuclei','cve_check','subdomain_takeover','wpscan','gowitness','whatweb',
   'waybackurls','gau','katana','urlfinder',
   'whois','asnmap','google_dorks'
 ];
@@ -18,10 +18,10 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'Subdomain Enumeration': ['crtsh','assetfinder','subfinder','amass','shuffledns'],
   'DNS':                   ['dnsx','dns_records','zone_transfer'],
   'HTTP & Ports':          ['httpx','naabu'],
-  'Vulnerability':         ['nuclei','subdomain_takeover','wpscan'],
+  'Vulnerability':         ['nuclei','cve_check','subdomain_takeover','wpscan'],
   'Screenshots, Dorks & Tech': ['gowitness','whatweb','google_dorks'],
   'URL Discovery':         ['waybackurls','gau','katana','urlfinder'],
-  'Asset Discovery':       ['whois','asnmap'],
+  'Asset Discovery':       ['whois','asnmap','shodan'],
   'AI':                    ['ai_analysis'],
 };
 
@@ -163,6 +163,9 @@ const TOOL_GROUPS: Record<string, string[]> = {
                     </label>
                     @if (t === 'ai_analysis' && !toolAvail(t)) {
                       <div class="ai-warning">Configure an AI API key in Settings to enable AI Analysis.</div>
+                    }
+                    @if (t === 'shodan' && !toolAvail(t)) {
+                      <div class="ai-warning">Save a Shodan API key in Settings to enable Shodan enrichment.</div>
                     }
                   }
                 </div>
@@ -356,7 +359,7 @@ export class ProjectDetailComponent implements OnInit {
   }
 
   unavailableLabel(name: string): string {
-    return name === 'ai_analysis' ? 'needs API key' : 'unavailable';
+    return ['ai_analysis', 'shodan'].includes(name) ? 'needs API key' : 'unavailable';
   }
 
   addTarget(isOos: boolean) {

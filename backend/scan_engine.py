@@ -43,12 +43,12 @@ _reuse_maps: dict[str, dict[tuple[str, str], ToolResult]] = {}
 _tool_semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_tool_groups))
 
 PHASES: list[dict[str, object]] = [
-    {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap"]},
+    {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap", "shodan"]},
     {"index": 2, "name": "Subdomain Enumeration", "tools": ["crtsh", "assetfinder", "subfinder", "amass", "shuffledns"]},
     {"index": 3, "name": "DNS Resolution", "tools": ["dnsx", "dns_records", "zone_transfer"]},
     {"index": 4, "name": "HTTP, TLS & Port Validation", "tools": ["httpx", "tlsx", "naabu"]},
     {"index": 5, "name": "URL Discovery", "tools": ["waybackurls", "gau", "katana", "urlfinder"]},
-    {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "subdomain_takeover", "wpscan", "gowitness", "whatweb", "ai_analysis"]},
+    {"index": 6, "name": "Vulnerability Scan, Takeovers, Screenshots, Dorks & AI", "tools": ["google_dorks", "nuclei", "cve_check", "subdomain_takeover", "wpscan", "gowitness", "whatweb", "ai_analysis"]},
 ]
 
 SUBDOMAIN_FILES = (

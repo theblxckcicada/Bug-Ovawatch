@@ -163,12 +163,12 @@ The whole stack ships as a **single container** — Angular build, FastAPI backe
 
 | Phase | Tools | Execution |
 |-------|-------|-----------|
-| 1 — Asset Discovery | `whois`, `asnmap` | parallel |
+| 1 — Asset Discovery | `whois`, `asnmap`, optional `shodan` | parallel |
 | 2 — Subdomain Enumeration | `crtsh`, `assetfinder`, `subfinder`, `amass`, `shuffledns` | **all parallel** |
 | 3 — DNS Resolution | `dnsx`, `dns_records`, `zone_transfer` | parallel |
 | 4 — HTTP, TLS & Port Validation | `httpx`, `tlsx`, `naabu` | parallel |
 | 5 — URL Discovery | `waybackurls`, `gau`, `katana`, `urlfinder` | **all parallel** (URLs are re-probed; dead links dropped) |
-| 6 — Vuln · Takeover · WordPress · Screenshots · Dorks · AI | `nuclei`, `subdomain_takeover`, `wpscan`, `gowitness`, `whatweb`, `google_dorks`, `ai_analysis` | parallel (AI runs last) |
+| 6 — Vuln · CVE · Takeover · WordPress · Screenshots · Dorks · AI | `nuclei`, `cve_check`, `subdomain_takeover`, `wpscan`, `gowitness`, `whatweb`, `google_dorks`, `ai_analysis` | parallel (AI runs last) |
 
 Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_merged.txt` → `resolved_subdomains.txt` / `probe_candidates.txt` → `alive_urls.txt`. Unresolved fallback candidates are never presented as alive; HTTP/TLS tools validate candidates and record explicit reachability states.
 
@@ -181,6 +181,13 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 - **WordPress scanning** — `wpscan` runs only against WordPress sites, but now draws its targets from **both** signals: hosts fingerprinted as WordPress (httpx tech-detection / whatweb) **and the validated alive-URL set** — any alive URL carrying a WordPress marker (`/wp-login.php`, `/wp-content/`, `/xmlrpc.php`, `/wp-json`, …) or living on a WordPress-fingerprinted host is scanned (normalised to its site root, capped per domain). It surfaces core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
 - **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
 - **Subdomain takeover** hunts dangling/claimable subdomains (nuclei takeover templates, plus `subzy` when available).
+- **CVE checks** run Nuclei's CVE-tagged templates only against URLs already
+  verified as alive. General Nuclei scanning excludes that tag to prevent the
+  dedicated CVE pass from producing duplicate findings.
+- **Shodan enrichment** is opt-in per assessment. It runs only when selected and
+  a Shodan API key is saved in Settings, performs one scoped hostname search per
+  root domain, rejects out-of-scope hostnames, and correlates returned services,
+  CPEs, IPs, and reported CVEs. Filtered Shodan searches may consume API credits.
 - **AI analysis** summarises findings when an AI provider key (OpenAI / Anthropic / Google / DeepSeek / Groq) is configured in Settings. With more than one in-scope asset, a **separate analysis is produced per asset**.
 
 ---
@@ -199,6 +206,8 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | tlsx | TLS and certificate inventory, including SAN relationships |
 | naabu | Port scanning |
 | nuclei | Template-based vulnerability scanning |
+| cve_check | CVE-tagged Nuclei checks against verified alive URLs |
+| shodan | Optional Shodan service and reported-CVE enrichment |
 | subzy | Subdomain-takeover detection (secondary engine) |
 | wpscan | WordPress vulnerability scanning (WordPress hosts only) |
 | gowitness | Web screenshots |

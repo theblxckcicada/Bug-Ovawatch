@@ -151,7 +151,19 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   aliveCount   = computed(() => this.subdomains().filter((s: any) => s['alive']).length);
   ports        = computed(() => this.byTool('naabu'));
-  vulns        = computed(() => this.byTool('nuclei'));
+  vulns        = computed(() => [
+    ...this.byCategory('vuln'),
+    ...(this.inventory()?.findings || [])
+      .filter(finding => finding.tool === 'shodan')
+      .map(finding => ({
+        ...finding.data,
+        name: finding.title,
+        severity: finding.severity,
+        template_id: String(finding.data['cve'] || finding.id),
+        matched_at: String(finding.data['cve'] || ''),
+        source: 'shodan',
+      })),
+  ]);
   urls         = computed(() => this.results().filter(r => r.category === 'url').flatMap(r => r.data));
   screenshots  = computed(() => this.byTool('gowitness'));
   dorks        = computed(() => this.byTool('google_dorks'));

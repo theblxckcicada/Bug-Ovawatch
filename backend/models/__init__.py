@@ -171,7 +171,7 @@ class ScanCreate(BaseModel):
             "crtsh","assetfinder","subfinder","amass","shuffledns",
             "dnsx","dns_records","zone_transfer",
             "httpx","tlsx","naabu",
-            "nuclei","subdomain_takeover","wpscan","gowitness","whatweb",
+            "nuclei","cve_check","subdomain_takeover","wpscan","gowitness","whatweb",
             "waybackurls","gau","katana","urlfinder",
             "whois","asnmap",
             "google_dorks","ai_analysis",

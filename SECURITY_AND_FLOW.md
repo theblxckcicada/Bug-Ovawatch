@@ -27,6 +27,9 @@
 7. Discover and revalidate URLs.
 8. Run evidence-selected vulnerability, WordPress, screenshot, takeover, and
    analysis tools.
+   - `cve_check` runs CVE-tagged Nuclei templates only against verified alive URLs.
+   - `shodan` runs only when explicitly selected and a saved API key is available;
+     returned hostnames are filtered back to the authorized root domain.
 9. Correlate tool output into stable assets, relationships, observations, and findings.
 10. Persist the normalized snapshot, scope fingerprint, and hashed execution manifest.
 11. Compare the snapshot with the preceding completed assessment.
