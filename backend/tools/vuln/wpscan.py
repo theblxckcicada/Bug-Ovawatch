@@ -1,10 +1,9 @@
-"""wpscan — WordPress vulnerability scanner for detected WordPress sites.
+"""WPScan vulnerability checks for every verified alive HTTP service.
 
-wpscan only targets hosts that were fingerprinted as WordPress by earlier phases
-(httpx tech-detection, and whatweb when its output is already present), so we never
-throw wpscan at non-WordPress URLs. When a WPScan API token is configured in
-Settings it is passed through so the WordPress Vulnerability Database is queried
-for CVE-level results; without it wpscan still runs with its built-in checks.
+Every alive service is passed to WPScan with ``--force`` so incomplete technology
+fingerprinting cannot hide a WordPress installation. When a WPScan API token is
+configured in Settings it is passed through for vulnerability-database results;
+without one, WPScan still performs its built-in checks.
 """
 from __future__ import annotations
 import json
@@ -16,32 +15,10 @@ from urllib.parse import urlparse
 from models import ToolCategory
 from tools.base import BaseTool, RunResult
 
-# Cap the number of WordPress sites scanned per domain — wpscan is slow and this
-# keeps a single scan from stalling on a large estate.
-MAX_TARGETS = 15
-
-# Path/query fragments that reliably indicate a WordPress site. An alive URL
-# containing any of these is treated as a WordPress target even when tech
-# fingerprinting (httpx/whatweb) did not flag its host — this is what lets wpscan
-# run off the validated alive-URL set produced by the URL-discovery phase.
-WP_URL_MARKERS: tuple[str, ...] = (
-    "/wp-content/",
-    "/wp-includes/",
-    "/wp-json",
-    "/wp-login.php",
-    "/wp-admin",
-    "/wp-cron.php",
-    "/wp-signup.php",
-    "/xmlrpc.php",
-    "/?author=",
-    "&author=",
-)
-
-
 class WpscanTool(BaseTool):
     name = "wpscan"
     category = ToolCategory.WORDPRESS
-    description = "WordPress vulnerability scanning via wpscan (WordPress sites only)"
+    description = "WordPress vulnerability checks across every verified alive site"
     parallel_group = "vuln"
 
     # ── Target selection ─────────────────────────────────────────────
@@ -56,43 +33,34 @@ class WpscanTool(BaseTool):
             return ""
         return f"{parsed.scheme}://{parsed.netloc}".lower()
 
-    @staticmethod
-    def _looks_wordpress(url: str) -> bool:
-        """True when a URL's path/query carries a known WordPress marker."""
-        low = (url or "").lower()
-        return any(marker in low for marker in WP_URL_MARKERS)
-
     def _wordpress_targets(self, out_dir: Path) -> list[str]:
-        """Collect site roots to hand to wpscan, from three WordPress signals:
+        """Collect every verified alive site root for WPScan.
 
-        1. httpx tech-detection (Wappalyzer) flagged the host as WordPress.
-        2. whatweb flagged a WordPress plugin (when its artifact already exists).
-        3. The validated alive URLs (``alive_urls.txt``) carry a WordPress path
-           marker, or belong to a host already fingerprinted as WordPress.
-
-        Every candidate is normalised to its scheme://host[:port] root and
-        de-duplicated. Non-WordPress URLs never enter the set, so the
-        WordPress-only guard holds and wpscan is never aimed at unrelated sites.
+        ``alive_urls.txt`` is the canonical source. All httpx results are also
+        accepted as a defensive fallback because httpx only emits responsive HTTP
+        services. Existing WhatWeb results provide a final compatibility fallback.
+        Candidates are normalized to scheme://host[:port] and de-duplicated.
         """
         targets: set[str] = set()
-        wp_hosts: set[str] = set()
 
-        # Signal 1: httpx -tech-detect (Wappalyzer) output from HTTP probing.
+        for url in self._read_lines(out_dir / "alive_urls.txt"):
+            if not url.lower().startswith(("http://", "https://")):
+                continue
+            root = self._site_root(url)
+            if root:
+                targets.add(root)
+
+        # httpx JSON lines represent services that answered an HTTP probe.
         for line in self._read_lines(out_dir / "httpx.jsonl"):
             try:
                 obj = json.loads(line)
             except Exception:
                 continue
-            tech = obj.get("tech") or obj.get("technologies") or []
-            if isinstance(tech, str):
-                tech = [tech]
-            if any("wordpress" in str(t).lower() for t in tech):
-                root = self._site_root(str(obj.get("url") or obj.get("input") or ""))
-                if root:
-                    targets.add(root)
-                    wp_hosts.add(self._extract_host(root))
+            root = self._site_root(str(obj.get("url") or obj.get("input") or ""))
+            if root:
+                targets.add(root)
 
-        # Signal 2: whatweb, when its artifact already exists this scan.
+        # Retain compatibility with scans whose only remaining artifact is WhatWeb.
         for line in self._read_lines(out_dir / "whatweb.jsonl"):
             try:
                 obj = json.loads(line)
@@ -101,21 +69,7 @@ class WpscanTool(BaseTool):
             for entry in (obj if isinstance(obj, list) else [obj]):
                 if not isinstance(entry, dict):
                     continue
-                plugins = entry.get("plugins", {}) or {}
-                if any("wordpress" in str(k).lower() for k in plugins):
-                    root = self._site_root(str(entry.get("target") or entry.get("uri") or ""))
-                    if root:
-                        targets.add(root)
-                        wp_hosts.add(self._extract_host(root))
-
-        # Signal 3: the validated alive URLs from the URL-discovery phase. A URL is
-        # a WordPress target when it carries a WordPress path marker, or when its
-        # host was already fingerprinted as WordPress by signals 1–2 above.
-        for url in self._read_lines(out_dir / "alive_urls.txt"):
-            if not url.lower().startswith("http"):
-                continue
-            if self._looks_wordpress(url) or self._extract_host(url) in wp_hosts:
-                root = self._site_root(url)
+                root = self._site_root(str(entry.get("target") or entry.get("uri") or ""))
                 if root:
                     targets.add(root)
 
@@ -127,13 +81,13 @@ class WpscanTool(BaseTool):
         summary_path = out_dir / "wpscan.txt"
 
         if not targets:
-            summary_path.write_text("No WordPress sites detected — wpscan skipped.\n")
-            return RunResult("No WordPress targets detected", "", 0, 0.0)
+            summary_path.write_text("No verified alive sites — wpscan skipped.\n")
+            return RunResult("No verified alive targets", "", 0, 0.0)
 
         api_token = os.environ.get("WPSCAN_API_TOKEN", "").strip()
         summaries: list[str] = []
 
-        for idx, url in enumerate(targets[:MAX_TARGETS]):
+        for idx, url in enumerate(targets):
             out_json = out_dir / f"wpscan_{idx}.json"
             cmd = [
                 "wpscan", "--url", url,
@@ -152,7 +106,7 @@ class WpscanTool(BaseTool):
             summaries.append(f"{url}: exit={result.returncode}")
 
         summary_path.write_text(
-            f"wpscan scanned {min(len(targets), MAX_TARGETS)} WordPress site(s)"
+            f"wpscan checked {len(targets)} verified alive site(s)"
             f"{' with API token' if api_token else ''}.\n" + "\n".join(summaries) + "\n"
         )
         return RunResult("\n".join(summaries), "", 0, 0.0)

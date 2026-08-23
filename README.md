@@ -178,7 +178,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 - **Edit program details:** a program's name and description can be changed at any time after creation (`PATCH /api/projects/{id}`).
 - **Resume vs. fresh:** reuse is permitted only from one completed assessment with the same scope, exclusions, selected tools, and wordlist fingerprint. Its evidence snapshot is copied into the new workspace before results are reused.
 - **URL validation** — every discovered URL (waybackurls, gau, katana, urlfinder) is re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before it reaches the results. Broken/blank screenshots are likewise discarded.
-- **WordPress scanning** — `wpscan` runs only against WordPress sites, but now draws its targets from **both** signals: hosts fingerprinted as WordPress (httpx tech-detection / whatweb) **and the validated alive-URL set** — any alive URL carrying a WordPress marker (`/wp-login.php`, `/wp-content/`, `/xmlrpc.php`, `/wp-json`, …) or living on a WordPress-fingerprinted host is scanned (normalised to its site root, capped per domain). It surfaces core/plugin/theme vulnerabilities, interesting findings and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
+- **WordPress scanning** — `wpscan` checks **every verified alive HTTP service**, even when technology fingerprinting does not identify WordPress. URLs are normalised to their `scheme://host:port` site root and de-duplicated, with no fixed target cap. WPScan's `--force` mode safely evaluates each service and surfaces any core/plugin/theme vulnerabilities, interesting findings, and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
 - **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
 - **Subdomain takeover** hunts dangling/claimable subdomains (nuclei takeover templates, plus `subzy` when available).
 - **CVE checks** run Nuclei's CVE-tagged templates only against URLs already
@@ -209,7 +209,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | cve_check | CVE-tagged Nuclei checks against verified alive URLs |
 | shodan | Optional Shodan service and reported-CVE enrichment |
 | subzy | Subdomain-takeover detection (secondary engine) |
-| wpscan | WordPress vulnerability scanning (WordPress hosts only) |
+| wpscan | WordPress vulnerability checks across every verified alive HTTP service |
 | gowitness | Web screenshots |
 | whatweb | Technology fingerprinting |
 | waybackurls | Historical URLs from the Wayback Machine |

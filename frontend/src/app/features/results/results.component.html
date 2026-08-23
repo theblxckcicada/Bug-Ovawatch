@@ -347,7 +347,7 @@
     <!-- ── WORDPRESS (wpscan) ── -->
     @if (activeTab() === 'wordpress') {
       @if (wpFindings().length === 0) {
-        <div class="empty-state"><div class="empty-icon">⬡</div><p>No WordPress findings. wpscan only runs against hosts fingerprinted as WordPress.</p></div>
+        <div class="empty-state"><div class="empty-icon">⬡</div><p>No WordPress findings. WPScan checked every verified alive HTTP service selected for this scan.</p></div>
       } @else {
         <div class="stat-grid" style="margin-bottom:16px">
           <div class="stat-card accent"><div class="stat-label">WordPress Sites</div><div class="stat-value green">{{wpSites()}}</div></div>
