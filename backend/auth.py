@@ -8,8 +8,8 @@ Design goals:
     table is needed — the token is self-verifying against a per-install secret.
   - Zero extra dependencies (uses hashlib/hmac/secrets from the stdlib).
 
-The auth record is persisted via the file storage layer at .meta/auth.json and is
-intentionally never mirrored to Azure — it is a local control-plane secret.
+The auth record is stored in the mandatory local SQL database as a
+control-plane secret.
 """
 from __future__ import annotations
 

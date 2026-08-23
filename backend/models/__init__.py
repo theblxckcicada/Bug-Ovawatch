@@ -313,14 +313,6 @@ class ToolResult(BaseModel):
 # STORAGE CONFIG
 # ══════════════════════════════════════════════════════════
 
-class StorageConfig(BaseModel):
-    azure_enabled: bool = False
-    connection_string: str = ""
-    account_name: str = ""
-    account_key: str = ""
-    table_prefix: str = "shadowgrid"
-
-
 class ToolApiKeysConfig(BaseModel):
     """Optional API keys consumed by external recon tools.
 

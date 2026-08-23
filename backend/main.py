@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from storage import DualStorage
+from storage import SqlStorage
 from tool_secrets import apply_tool_api_keys
 from models import ScanStatus
 from observability import metrics_middleware, prometheus_metrics
@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Global storage instance (singleton) ──────────────────────────
-storage = DualStorage(settings.output_dir)
+storage = SqlStorage(settings.output_dir)
 
 
 @asynccontextmanager
@@ -35,17 +35,6 @@ async def lifespan(app: FastAPI):
     # Ensure output / data dirs exist
     Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
-
-    # Load persisted Azure config on startup
-    cfg = await storage.load_storage_config()
-
-    if cfg.get("azure_enabled"):
-        storage.enable_azure(
-            conn_str=cfg.get("connection_string", ""),
-            account=cfg.get("account_name", ""),
-            key=cfg.get("account_key", ""),
-            prefix=cfg.get("table_prefix", "shadowgrid"),
-        )
 
     apply_tool_api_keys(await storage.load_tool_api_keys())
 
@@ -128,6 +117,11 @@ async def readiness():
     checks = {
         "output_exists": output.is_dir(),
         "output_writable": output.is_dir() and os.access(output, os.W_OK),
+        "database_exists": storage.database_path.is_file(),
+        "database_writable": (
+            storage.database_path.is_file()
+            and os.access(storage.database_path, os.W_OK)
+        ),
         "data_exists": data.is_dir(),
         "data_readable": data.is_dir() and os.access(data, os.R_OK),
     }

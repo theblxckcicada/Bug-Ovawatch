@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
 from models import Scan, ScanStatus, new_id
-from storage import DualStorage
+from storage import SqlStorage
 from scan_engine import run_scan
 from tools.registry import REGISTRY
 
@@ -57,7 +57,6 @@ async def main():
     parser.add_argument("--wordlist", help="Custom DNS wordlist path")
     parser.add_argument("--output-dir", default="./output", help="Output directory")
     parser.add_argument("--data-dir", default="./data", help="Data directory")
-    parser.add_argument("--azure-conn", help="Azure Storage connection string")
     parser.add_argument("--list-tools", action="store_true", help="List available tools and exit")
     args = parser.parse_args()
 
@@ -84,9 +83,7 @@ async def main():
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Storage ──────────────────────────────────────────────────
-    storage = DualStorage(str(output_dir))
-    if args.azure_conn:
-        storage.enable_azure(conn_str=args.azure_conn)
+    storage = SqlStorage(str(output_dir))
 
     # ── Create project + scan ────────────────────────────────────
     from models import Project, Target

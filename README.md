@@ -36,7 +36,8 @@ It's built for **security teams, penetration testers, and bug-bounty hunters** w
 - **Resumable & cancellable** — stop a run mid-flight (in-flight processes are terminated **and the cancelled assessment's data is deleted**), or resume a program and reuse prior successful results instead of re-running finished work.
 - **Editable & tidy** — rename a program or edit its description after creation, and **clear all of a program's assessment history** (including cancelled runs) in one click.
 - **Scope-aware** — out-of-scope patterns (incl. wildcards) are filtered at every stage, so results stay inside your authorisation.
-- **Bring your own storage** — always-on local JSON/file storage, with optional mirroring to Azure Table Storage.
+- **SQL-first persistence** — mandatory local SQLite storage with transactions,
+  foreign keys, WAL concurrency, and automatic migration from legacy JSON metadata.
 
 ---
 
@@ -136,13 +137,12 @@ By default the reset rotates the token-signing secret (logging out all sessions)
                  │
 ┌────────────────▼─────────────────────────┐
 │  Storage Layer                           │
-│  ├─ File storage (always on)             │
-│  │    projects/<project>/scans/<scan>/  │
-│  │      assets/<domain>/<tool artifacts>│
-│  │    output/.meta/{projects,scans,…}    │
-│  └─ Azure Table Storage (optional)       │
-│       shadowgrid{Projects|Targets|Scans| │
-│                  Results|Config}         │
+│  ├─ SQLite: output/shadowgrid.db         │
+│  │    projects, targets, scans, results, │
+│  │    inventory, auth, configuration     │
+│  └─ Evidence filesystem                 │
+│       projects/<project>/scans/<scan>/  │
+│         assets/<domain>/<tool artifacts>│
 └──────────────────────────────────────────┘
 ```
 
@@ -227,9 +227,6 @@ python3 recon.py -d example.com shop.example.com --oos "*.internal.example.com"
 # Custom output / data directories
 python3 recon.py -d example.com --output-dir ./output --data-dir ./data
 
-# With Azure storage
-python3 recon.py -d example.com --azure-conn "DefaultEndpointsProtocol=https;..."
-
 # List all tools and their availability
 python3 recon.py -d x --list-tools
 ```
@@ -256,20 +253,14 @@ docker compose -f docker/docker-compose.yml down
 
 ---
 
-## Azure Table Storage (optional)
+## SQL Storage
 
-1. Create an Azure Storage account.
-2. In the web UI → **Settings** → enable **Azure Table Storage**.
-3. Paste your connection string (or account name + key) — tables are created automatically.
-
-Or configure it via environment in `docker/docker-compose.yml`:
-
-```env
-AZURE_STORAGE_ENABLED=true
-AZURE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
-```
-
-Local file storage is always active; Azure is mirrored on top of it.
+SQLite is the mandatory primary store and requires no external service or paid
+account. The database is `output/shadowgrid.db` and uses WAL mode, foreign keys,
+transactional upserts, and cascade deletes. On the first SQL-backed startup,
+ShadowGrid imports existing projects, targets, scans, results, inventories,
+authentication, and tool keys from `output/.meta/`. The legacy JSON tree is left
+untouched as a recovery copy but is no longer read after migration.
 
 ---
 
@@ -293,7 +284,7 @@ shadow-grid/
 ├── backend/            FastAPI app, scan engine, tool layer, storage, auth
 │   ├── scan_engine.py      phased + parallel orchestration
 │   ├── tools/              one module per security tool (+ registry.py)
-│   ├── storage/            file + Azure dual storage
+│   ├── storage/            mandatory SQLite persistence
 │   ├── tests/              pytest suite (URL validation, wpscan targets, storage, endpoints)
 │   └── reset_password.py   offline password-reset utility
 ├── frontend/           Angular 17 SPA — dashboard, programs, scan activity,

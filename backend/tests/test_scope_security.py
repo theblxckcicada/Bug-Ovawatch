@@ -8,7 +8,7 @@ import pytest
 
 from models import Scan
 from scope import normalize_domain, scan_workspace, scope_fingerprint
-from storage.file_storage import FileStorage
+from storage import SqlStorage
 
 
 @pytest.mark.parametrize("value", [
@@ -42,7 +42,7 @@ def test_scope_fingerprint_changes_with_policy() -> None:
 
 @pytest.mark.asyncio
 async def test_artifact_deletion_cannot_escape_workspace(tmp_path: Path) -> None:
-    storage = FileStorage(tmp_path)
+    storage = SqlStorage(tmp_path)
     scan = Scan(
         project_id=str(uuid.uuid4()),
         workspace="../outside",
@@ -53,7 +53,7 @@ async def test_artifact_deletion_cannot_escape_workspace(tmp_path: Path) -> None
 
 @pytest.mark.asyncio
 async def test_owned_scan_workspace_is_deleted(tmp_path: Path) -> None:
-    storage = FileStorage(tmp_path)
+    storage = SqlStorage(tmp_path)
     scan = Scan(project_id=str(uuid.uuid4()))
     workspace = scan_workspace(tmp_path, scan.project_id, scan.id)
     workspace.mkdir(parents=True)

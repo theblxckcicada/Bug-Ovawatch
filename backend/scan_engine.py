@@ -23,7 +23,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 from models import Scan, ScanProgress, ScanStatus, ToolCategory, ToolResult
-from storage import DualStorage
+from storage.base import BaseStorage
 from tools.registry import get_tool
 from tool_secrets import apply_tool_api_keys
 from scope import scan_workspace, scope_fingerprint
@@ -83,7 +83,7 @@ def _selected_tools(scan: Scan, phase: dict[str, object]) -> list[str]:
 
 async def _emit(
     scan: Scan,
-    storage: DualStorage,
+    storage: BaseStorage,
     tool: str,
     status: str,
     message: str = "",
@@ -140,12 +140,12 @@ async def _emit(
     logger.info("[%s] %s: %s — %s", scan.id, tool, status, message)
 
 
-async def _scan_cancelled(scan: Scan, storage: DualStorage) -> bool:
+async def _scan_cancelled(scan: Scan, storage: BaseStorage) -> bool:
     latest = await storage.get_scan(scan.id)
     return bool(latest and latest.status == ScanStatus.CANCELLED)
 
 
-async def _build_reuse_map(scan: Scan, storage: DualStorage) -> dict[tuple[str, str], ToolResult]:
+async def _build_reuse_map(scan: Scan, storage: BaseStorage) -> dict[tuple[str, str], ToolResult]:
     """Map (domain, tool) → prior successful ToolResult from the project's most recent
     earlier scan, so a resumed scan can continue instead of repeating finished work."""
     reuse: dict[tuple[str, str], ToolResult] = {}
@@ -414,7 +414,7 @@ async def _run_tool(
     oos: list[str],
     output_dir: Path,
     data_dir: Path,
-    storage: DualStorage,
+    storage: BaseStorage,
     wordlist: str | None,
     *,
     phase: str,
@@ -534,7 +534,7 @@ async def _run_phase(
     oos: list[str],
     output_dir: Path,
     data_dir: Path,
-    storage: DualStorage,
+    storage: BaseStorage,
     overall_completed_tools_ref: dict[str, int],
     overall_total_tools: int,
 ) -> list[ToolResult | None]:
@@ -605,7 +605,7 @@ async def run_scan(
     oos: list[str],
     output_dir: Path,
     data_dir: Path,
-    storage: DualStorage,
+    storage: BaseStorage,
     reuse_previous: bool = False,
 ) -> None:
     """Main scan coroutine — called by the API background task or CLI."""

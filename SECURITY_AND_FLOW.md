@@ -11,8 +11,8 @@
 - CORS defaults to `*` because authentication uses explicit bearer tokens, not
   browser cookies. Set `CORS_ORIGINS` to a comma-separated origin allowlist when
   deploying beyond a trusted VM or LAN.
-- Storage credentials and tool API keys are local control-plane secrets and are
-  not mirrored to Azure Table Storage.
+- Authentication and tool API keys are stored in the mandatory local SQLite
+  database and are never sent to an external storage service.
 - Provider API keys remain optional. Every included scanner is open source;
   paid provider subscriptions are not required for the default pipeline.
 
@@ -36,6 +36,7 @@
 
 ```text
 output/
+  shadowgrid.db
   projects/<project-id>/
     scans/<scan-id>/
       assets/<canonical-domain>/
@@ -45,8 +46,10 @@ output/
         alive_urls.txt
         <tool artifacts>
       _manifest.json
-  .meta/inventory/<scan-id>.json
 ```
+
+On upgrade, the previous `output/.meta/` JSON metadata is imported into SQLite
+once and retained as a recovery copy. All subsequent metadata operations use SQL.
 
 ## Local operational endpoints
 

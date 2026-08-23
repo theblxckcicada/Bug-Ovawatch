@@ -23,13 +23,6 @@ class Settings(BaseSettings):
     output_dir: str = "/app/output"
     data_dir:   str = "/app/data"
 
-    # Azure Table Storage (all optional — file storage is always enabled)
-    azure_storage_enabled: bool = False
-    azure_connection_string: str = ""
-    azure_account_name: str = ""
-    azure_account_key: str = ""
-    azure_table_prefix: str = "shadowgrid"
-
     # ── Scan engine ─────────────────────────────────────
     max_concurrent_tool_groups: int = 4   # groups run in parallel
     max_tools_per_scan: int = 40

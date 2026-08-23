@@ -1,9 +1,9 @@
 """Normalized inventory and change-detection tests."""
 from __future__ import annotations
 
-from models import ToolCategory, ToolResult
+from models import Project, Scan, ToolCategory, ToolResult
 from inventory import AssetType, build_inventory, compare_inventories
-from storage.file_storage import FileStorage
+from storage import SqlStorage
 
 
 def _result(tool: str, category: ToolCategory, rows: list[dict]) -> ToolResult:
@@ -83,7 +83,9 @@ def test_delta_reports_added_removed_and_resolved() -> None:
 
 
 async def test_inventory_round_trip_and_scan_deletion(tmp_path) -> None:
-    storage = FileStorage(tmp_path)
+    storage = SqlStorage(tmp_path)
+    await storage.save_project(Project(id="project-1", name="Test"))
+    await storage.save_scan(Scan(id="scan-1", project_id="project-1"))
     snapshot = build_inventory("scan-1", "project-1", ["example.com"], [])
     await storage.save_inventory(snapshot)
 

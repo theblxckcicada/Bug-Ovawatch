@@ -8,7 +8,7 @@ a forgotten password cannot be changed through the API by design. This offline
 script is the supported recovery path.
 
 It reuses the application's own primitives (``auth.hash_password`` /
-``auth.new_secret``) and persistence layer (``FileStorage.save_auth``), so the
+``auth.new_secret``) and persistence layer (``SqlStorage.save_auth``), so the
 written record always matches what the running API expects.
 
 Usage
@@ -17,7 +17,7 @@ Interactive (recommended) — prompts twice, nothing hits the shell history::
 
     python3 reset_password.py
 
-Inside the Docker container (auth.json lives in the ``shadowgrid-output`` volume)::
+Inside the Docker container (SQLite lives in the ``shadowgrid-output`` volume)::
 
     docker exec -it shadowgrid python3 /app/backend/reset_password.py
 
@@ -43,7 +43,7 @@ import sys
 from pathlib import Path
 
 import auth as auth_lib
-from storage.file_storage import FileStorage
+from storage import SqlStorage
 
 logger = logging.getLogger("shadowgrid.reset_password")
 
@@ -112,7 +112,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         default=None,
-        help="ShadowGrid output directory holding .meta/auth.json. "
+        help="ShadowGrid output directory holding shadowgrid.db. "
         "Defaults to the app's configured OUTPUT_DIR.",
     )
     parser.add_argument(
@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
 
     output_dir = Path(args.output_dir or _default_output_dir())
     try:
-        storage = FileStorage(output_dir)
+        storage = SqlStorage(output_dir)
     except OSError as exc:
         logger.error("Cannot access output directory %s: %s", output_dir, exc)
         return 1

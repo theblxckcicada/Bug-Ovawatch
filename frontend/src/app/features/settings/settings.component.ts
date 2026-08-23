@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
-import { StorageConfig, ToolApiKeysConfig } from '../../core/models';
+import { ToolApiKeysConfig } from '../../core/models';
 
 @Component({
   selector: 'sg-settings',
@@ -11,52 +11,9 @@ import { StorageConfig, ToolApiKeysConfig } from '../../core/models';
   template: `
     <div class="page">
       <h1 class="page-title">Settings</h1>
-      <p class="page-sub" style="margin-bottom:28px">Configure storage, recon provider keys, and AI analysis keys</p>
+      <p class="page-sub" style="margin-bottom:28px">Configure recon provider keys and AI analysis keys</p>
 
       <div class="settings-grid">
-        <div class="card">
-          <h3 class="section-title">Azure Table Storage</h3>
-          <p class="section-copy">Optional — results are always saved to disk. Enable Azure for additional cloud backup and multi-instance sync.</p>
-
-          <label class="toggle-row" style="margin-bottom:20px">
-            <span>Enable Azure Table Storage</span>
-            <input type="checkbox" [(ngModel)]="storageCfg.azure_enabled" />
-          </label>
-
-          @if (storageCfg.azure_enabled) {
-            <div class="form-group">
-              <label class="form-label">Connection String (preferred)</label>
-              <input class="form-input" [(ngModel)]="storageCfg.connection_string" placeholder="DefaultEndpointsProtocol=https;AccountName=…" />
-            </div>
-            <p class="separator">— OR use account name + key —</p>
-            <div class="form-group">
-              <label class="form-label">Account Name</label>
-              <input class="form-input" [(ngModel)]="storageCfg.account_name" placeholder="mystorageaccount" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Account Key</label>
-              <input class="form-input" type="password" [(ngModel)]="storageCfg.account_key" placeholder="Leave blank to keep existing key" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Table Prefix</label>
-              <input class="form-input" [(ngModel)]="storageCfg.table_prefix" placeholder="shadowgrid" />
-              <span class="hint">Tables: {{storageCfg.table_prefix}}Projects, {{storageCfg.table_prefix}}Targets, {{storageCfg.table_prefix}}Scans, {{storageCfg.table_prefix}}Results</span>
-            </div>
-          }
-
-          @if (storageSaved()) {
-            <div class="alert alert-success" style="margin-bottom:16px">✓ Storage configuration saved</div>
-          }
-          @if (storageError()) {
-            <div class="alert alert-danger" style="margin-bottom:16px">✗ {{storageError()}}</div>
-          }
-
-          <button class="btn btn-primary" (click)="saveStorage()" [disabled]="storageSaving()">
-            @if (storageSaving()) { <span class="spinner-sm"></span> }
-            Save Storage
-          </button>
-        </div>
-
         <div class="card">
           <h3 class="section-title">Recon API Keys</h3>
           <p class="section-copy">Optional keys used by recon tools that need authenticated APIs. Blank fields keep the existing saved value.</p>
@@ -163,7 +120,8 @@ import { StorageConfig, ToolApiKeysConfig } from '../../core/models';
       <div class="card" style="max-width:960px;margin-top:16px">
         <h3 class="section-title" style="margin-bottom:16px">About</h3>
         <div class="about-row"><span>Version</span><span class="mono">3.0.0</span></div>
-        <div class="about-row"><span>Storage</span><span class="mono">File (always) + Azure (optional)</span></div>
+        <div class="about-row"><span>Primary Storage</span><span class="mono">SQLite (mandatory)</span></div>
+        <div class="about-row"><span>Database</span><span class="mono">/app/output/shadowgrid.db</span></div>
         <div class="about-row"><span>Output Directory</span><span class="mono">/app/output</span></div>
         <div class="about-row"><span>Data Directory</span><span class="mono">/app/data</span></div>
       </div>
@@ -187,16 +145,12 @@ import { StorageConfig, ToolApiKeysConfig } from '../../core/models';
   `]
 })
 export class SettingsComponent implements OnInit {
-  storageCfg: StorageConfig = { azure_enabled:false, connection_string:'', account_name:'', account_key:'', table_prefix:'shadowgrid' };
   apiKeys: ToolApiKeysConfig = {
     pdcp_api_key:'', github_token:'', shodan_api_key:'', censys_api_id:'', censys_api_secret:'', chaos_key:'',
     wpscan_api_token:'', google_cse_api_key:'', google_cse_cx:'',
     openai_api_key:'', anthropic_api_key:'', google_ai_api_key:'', deepseek_api_key:'', groq_api_key:''
   };
 
-  storageSaving = signal(false);
-  storageSaved = signal(false);
-  storageError = signal('');
   keysSaving = signal(false);
   keysSaved = signal(false);
   keysError = signal('');
@@ -204,16 +158,7 @@ export class SettingsComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit() {
-    this.api.getStorageConfig().subscribe(c => { this.storageCfg = { ...c, account_key: '' }; });
     this.api.getToolApiKeys().subscribe(c => { this.apiKeys = { ...this.apiKeys, ...c }; });
-  }
-
-  saveStorage() {
-    this.storageSaving.set(true); this.storageSaved.set(false); this.storageError.set('');
-    this.api.saveStorageConfig(this.storageCfg).subscribe({
-      next: () => { this.storageSaving.set(false); this.storageSaved.set(true); setTimeout(() => this.storageSaved.set(false), 3000); },
-      error: e => { this.storageSaving.set(false); this.storageError.set(e.message || 'Save failed'); },
-    });
   }
 
   saveApiKeys() {

@@ -132,14 +132,6 @@ export interface ScanProgressEvent {
   overall_total_tools?: number;
 }
 
-export interface StorageConfig {
-  azure_enabled: boolean;
-  connection_string: string;
-  account_name: string;
-  account_key: string;
-  table_prefix: string;
-}
-
 export interface ToolApiKeysConfig {
   pdcp_api_key: string;
   github_token: string;

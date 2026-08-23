@@ -11,11 +11,6 @@ services:
       - shadowgrid-output:/app/output
       - shadowgrid-data:/app/data
     environment:
-      - AZURE_STORAGE_ENABLED=${AZURE_STORAGE_ENABLED:-false}
-      - AZURE_CONNECTION_STRING=${AZURE_CONNECTION_STRING:-}
-      - AZURE_ACCOUNT_NAME=${AZURE_ACCOUNT_NAME:-}
-      - AZURE_ACCOUNT_KEY=${AZURE_ACCOUNT_KEY:-}
-      - AZURE_TABLE_PREFIX=${AZURE_TABLE_PREFIX:-shadowgrid}
       - OUTPUT_DIR=/app/output
       - DATA_DIR=/app/data
       - CORS_ORIGINS=${CORS_ORIGINS:-*}

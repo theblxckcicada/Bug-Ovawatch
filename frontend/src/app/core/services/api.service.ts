@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Project, Target, Scan, ToolResult, ToolInfo, StorageConfig, ToolApiKeysConfig, InventorySnapshot, InventoryDelta } from '../models';
+import { Project, Target, Scan, ToolResult, ToolInfo, ToolApiKeysConfig, InventorySnapshot, InventoryDelta } from '../models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -89,12 +89,6 @@ export class ApiService {
   }
 
   // ── Settings ──────────────────────────────────────────────────
-  getStorageConfig(): Observable<StorageConfig> {
-    return this.http.get<StorageConfig>(`${this.base}/settings/storage`);
-  }
-  saveStorageConfig(cfg: StorageConfig): Observable<any> {
-    return this.http.post<any>(`${this.base}/settings/storage`, cfg);
-  }
   getToolApiKeys(): Observable<ToolApiKeysConfig> {
     return this.http.get<ToolApiKeysConfig>(`${this.base}/settings/api-keys`);
   }

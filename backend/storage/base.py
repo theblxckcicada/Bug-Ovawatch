@@ -64,18 +64,12 @@ class BaseStorage(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def save_storage_config(self, config: dict) -> None: ...
-
-    @abstractmethod
-    async def load_storage_config(self) -> dict: ...
-
-    @abstractmethod
     async def save_tool_api_keys(self, config: dict) -> None: ...
 
     @abstractmethod
     async def load_tool_api_keys(self) -> dict: ...
 
-    # ── Auth (local-only control-plane secret; not mirrored to Azure) ──
+    # Authentication control-plane secret.
     async def save_auth(self, record: dict) -> None:
         raise NotImplementedError
 

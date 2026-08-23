@@ -1,4 +1,4 @@
-"""Unit tests for scan/result deletion in FileStorage.
+"""Unit tests for scan/result deletion in mandatory SQL storage.
 
 Covers the storage primitives behind T3 (cancel purges a scan's data) and T5
 (clearing a project removes every scan). Deletion must be idempotent and scoped
@@ -9,11 +9,12 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from models import Scan, ScanStatus, ToolCategory, ToolResult
-from storage.file_storage import FileStorage
+from models import Project, Scan, ScanStatus, ToolCategory, ToolResult
+from storage import SqlStorage
 
 
-def _seed(store: FileStorage, project_id: str, scan_id: str) -> None:
+def _seed(store: SqlStorage, project_id: str, scan_id: str) -> None:
+    asyncio.run(store.save_project(Project(id=project_id, name="Test")))
     asyncio.run(store.save_scan(Scan(id=scan_id, project_id=project_id, status=ScanStatus.RUNNING)))
     asyncio.run(store.save_result(ToolResult(
         scan_id=scan_id, project_id=project_id, tool="subfinder",
@@ -23,7 +24,7 @@ def _seed(store: FileStorage, project_id: str, scan_id: str) -> None:
 
 
 def test_delete_results_removes_only_results(tmp_path: Path):
-    store = FileStorage(tmp_path)
+    store = SqlStorage(tmp_path)
     _seed(store, "p1", "s1")
     assert asyncio.run(store.list_results("s1"))
     asyncio.run(store.delete_results("s1"))
@@ -33,13 +34,13 @@ def test_delete_results_removes_only_results(tmp_path: Path):
 
 
 def test_delete_results_idempotent(tmp_path: Path):
-    store = FileStorage(tmp_path)
+    store = SqlStorage(tmp_path)
     # Deleting a scan that never had results must not raise.
     asyncio.run(store.delete_results("missing"))
 
 
 def test_delete_scan_removes_record_and_results(tmp_path: Path):
-    store = FileStorage(tmp_path)
+    store = SqlStorage(tmp_path)
     _seed(store, "p1", "s1")
     asyncio.run(store.delete_scan("s1", "p1"))
     assert asyncio.run(store.get_scan("s1")) is None
@@ -49,7 +50,7 @@ def test_delete_scan_removes_record_and_results(tmp_path: Path):
 
 
 def test_delete_scan_scoped_to_target(tmp_path: Path):
-    store = FileStorage(tmp_path)
+    store = SqlStorage(tmp_path)
     _seed(store, "p1", "s1")
     _seed(store, "p1", "s2")
     asyncio.run(store.delete_scan("s1", "p1"))
