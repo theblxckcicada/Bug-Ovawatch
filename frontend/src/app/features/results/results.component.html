@@ -302,11 +302,29 @@
       </div>
       <div class="card">
         <div class="section-head"><span class="section-title">Open Ports (naabu)</span><span class="section-count">{{ports().length}}</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
-          @for (p of portSummary(); track p.port) {
-            <span [class]="portClass(p.port)" [title]="p.count + ' hosts'">:{{p.port}} <small>{{p.count}}</small></span>
-          }
-        </div>
+        @if (ports().length === 0) {
+          <div class="empty-state"><div class="empty-icon">⬡</div><p>No open ports reported by Naabu.</p></div>
+        } @else {
+          <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 14px">
+            @for (p of portSummary(); track p.port) {
+              <span [class]="portClass(p.port)" [title]="p.count + ' targets'">:{{p.port}} <small>{{p.count}}</small></span>
+            }
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Target</th><th>Port</th><th>Service</th><th>State</th><th></th></tr></thead>
+            <tbody>
+              @for (result of sortedPorts(); track $index) {
+                <tr>
+                  <td class="mono">{{result['host'] || '—'}}</td>
+                  <td><span [class]="portClass(result['port'])">{{result['port']}}</span></td>
+                  <td>{{result['service'] || 'Unknown'}}</td>
+                  <td><span class="badge badge-alive">{{result['state'] || 'open'}}</span></td>
+                  <td><button class="copy-btn" (click)="copyItem(result, 'host')">copy target</button></td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        }
       </div>
     }
 

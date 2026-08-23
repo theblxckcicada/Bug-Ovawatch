@@ -275,6 +275,11 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     return [...m.entries()].map(([port,count])=>({port,count})).sort((a,b)=>b.count-a.count);
   });
 
+  sortedPorts = computed(() => [...this.ports()].sort((a: any, b: any) => {
+    const hostOrder = String(a['host'] || '').localeCompare(String(b['host'] || ''));
+    return hostOrder || Number(a['port'] || 0) - Number(b['port'] || 0);
+  }));
+
 
   // ── Filter setters: reset pagination whenever a filter changes ─────────
   setSubQ(value: string) { this.subQ.set(value); this.subPage.set(0); }
