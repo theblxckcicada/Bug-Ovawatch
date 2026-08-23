@@ -25,13 +25,24 @@
       </div>
     }
 
-    <!-- Tab bar -->
-    <div class="tab-bar">
-      @for (t of tabs; track t.id) {
-        <button class="tab-btn" [class.active]="activeTab()===t.id" (click)="setTab(t.id)">
-          {{t.label}}
-          @if (tabCount(t.id)) { <span class="tab-cnt">{{tabCount(t.id)}}</span> }
-        </button>
+    <!-- Persistent result and evidence navigation -->
+    <div class="results-nav">
+      <div class="tab-bar" aria-label="Result sections">
+        @for (t of tabs; track t.id) {
+          <button class="tab-btn" [class.active]="isPrimaryTabActive(t.id)" [attr.aria-current]="isPrimaryTabActive(t.id) ? 'page' : null" (click)="setTab(t.id)">
+            {{t.label}}
+            @if (tabCount(t.id)) { <span class="tab-cnt">{{tabCount(t.id)}}</span> }
+          </button>
+        }
+      </div>
+      @if (isEvidenceView()) {
+        <div class="evidence-nav" aria-label="Evidence sources">
+          @for (tab of evidenceTabs; track tab.id) {
+            <button class="evidence-nav-btn" [class.active]="activeTab() === tab.id" [attr.aria-current]="activeTab() === tab.id ? 'page' : null" (click)="setTab(tab.id)">
+              <span>{{tab.label}}</span><b>{{tabCount(tab.id)}}</b>
+            </button>
+          }
+        </div>
       }
     </div>
 
@@ -90,12 +101,7 @@
 
     @if (activeTab() === 'evidence') {
       <div class="card">
-        <div class="section-head"><div><span class="section-title">Raw evidence explorer</span><p class="page-sub">Open tool-oriented records when you need to validate normalized assets and findings.</p></div></div>
-        <div class="evidence-grid">
-          @for (tab of evidenceTabs; track tab.id) {
-            <button class="evidence-link" (click)="setTab(tab.id)"><span>{{tab.label}}</span><b>{{tabCount(tab.id)}}</b></button>
-          }
-        </div>
+        <div class="empty-state evidence-welcome"><div class="empty-icon">⌕</div><h3>Raw evidence explorer</h3><p>Choose an evidence source from the persistent navigator above. It remains available while you inspect and switch between results.</p></div>
       </div>
     }
 

@@ -128,6 +128,16 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     setTimeout(() => this.initCharts(), 100);
   }
 
+  /** True while the user is browsing the evidence landing page or one of its sources. */
+  isEvidenceView(): boolean {
+    return this.activeTab() === 'evidence' || this.evidenceTabs.some(tab => tab.id === this.activeTab());
+  }
+
+  /** Keep Evidence highlighted while one of its tool-oriented result views is open. */
+  isPrimaryTabActive(tab: TabId): boolean {
+    return tab === 'evidence' ? this.isEvidenceView() : this.activeTab() === tab;
+  }
+
   // ── Data extractors ─────────────────────────────────────────────
   private byCategory(cat: string) { return this.results().filter(r => r.category === cat).flatMap(r => r.data); }
   private byTool(tool: string)    { return this.results().filter(r => r.tool === tool).flatMap(r => r.data); }
