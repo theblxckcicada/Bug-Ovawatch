@@ -28,6 +28,7 @@ export interface Scan {
   error: string;
   scope_hash: string;
   workspace: string;
+  artifacts_deleted_at: string | null;
 }
 
 export interface ToolInfo {

@@ -22,6 +22,10 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   inventoryDelta = signal<InventoryDelta | null>(null);
   loading = signal(true);
   scanStatus = signal<string>('');
+  artifactsDeletedAt = signal<string | null>(null);
+  deletingArtifacts = signal(false);
+  cleanupMessage = signal('');
+  cleanupError = signal('');
   private pollHandle?: number;
   activeTab = signal<TabId>('overview');
   lightbox: any = null;
@@ -96,6 +100,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.getScan(this.scanId).subscribe({
       next: scan => {
         this.scanStatus.set(scan.status);
+        this.artifactsDeletedAt.set(scan.artifacts_deleted_at || null);
         if (!['running', 'pending'].includes(scan.status)) this.refreshInventory();
       },
       error: () => {},
@@ -136,6 +141,41 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Keep Evidence highlighted while one of its tool-oriented result views is open. */
   isPrimaryTabActive(tab: TabId): boolean {
     return tab === 'evidence' ? this.isEvidenceView() : this.activeTab() === tab;
+  }
+
+  /** Permanently remove raw files after an explicit confirmation, preserving SQL evidence. */
+  deleteRawOutputs(): void {
+    if (this.isLive() || this.deletingArtifacts() || this.artifactsDeletedAt()) return;
+    const confirmed = window.confirm(
+      'Delete this assessment\'s raw output files?\n\n' +
+      'Database records, findings, inventory, and the assessment will be kept. ' +
+      'Screenshots, raw logs, tool JSON/TXT files, and downloadable artifacts cannot be recovered.'
+    );
+    if (!confirmed) return;
+
+    this.deletingArtifacts.set(true);
+    this.cleanupMessage.set('');
+    this.cleanupError.set('');
+    this.api.deleteRawOutputs(this.scanId).subscribe({
+      next: result => {
+        this.deletingArtifacts.set(false);
+        this.artifactsDeletedAt.set(new Date().toISOString());
+        this.cleanupMessage.set(
+          `Deleted ${result.files_deleted} raw file(s) and freed ${this.formatBytes(result.bytes_freed)}. Database records were retained.`
+        );
+      },
+      error: error => {
+        this.deletingArtifacts.set(false);
+        this.cleanupError.set(error?.error?.detail || 'Raw-output cleanup failed.');
+      },
+    });
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
   }
 
   // ── Data extractors ─────────────────────────────────────────────

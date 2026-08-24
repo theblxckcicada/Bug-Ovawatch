@@ -174,6 +174,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 
 **Notes**
 - **Cancel deletes data:** every assessment owns an isolated `projects/<project-id>/scans/<scan-id>/assets/` workspace. Cancelling kills in-flight processes and deletes that assessment's results, progress, and artifacts without affecting another run.
+- **Raw-output cleanup:** a completed, failed, or cancelled assessment can delete its isolated raw artifact workspace from the Results page while retaining the assessment, parsed tool results, normalized inventory, relationships, and findings in SQLite. Active assessments are protected from cleanup.
 - **Clear program data:** from a program's page you can wipe **all** of its assessment history — every run including cancelled ones, and their results — while keeping the program and its scope. Any still-running assessment is terminated first.
 - **Edit program details:** a program's name and description can be changed at any time after creation (`PATCH /api/projects/{id}`).
 - **Resume vs. fresh:** reuse is permitted only from one completed assessment with the same scope, exclusions, selected tools, and wordlist fingerprint. Its evidence snapshot is copied into the new workspace before results are reused.

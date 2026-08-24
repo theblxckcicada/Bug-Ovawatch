@@ -213,6 +213,7 @@ class Scan(BaseModel):
     error: str = ""
     scope_hash: str = ""
     workspace: str = ""
+    artifacts_deleted_at: Optional[datetime] = None
 
     def to_table_entity(self) -> dict:
         import json
@@ -228,6 +229,7 @@ class Scan(BaseModel):
             "error": self.error,
             "scope_hash": self.scope_hash,
             "workspace": self.workspace,
+            "artifacts_deleted_at": self.artifacts_deleted_at.isoformat() if self.artifacts_deleted_at else "",
         }
 
     @staticmethod
@@ -245,6 +247,10 @@ class Scan(BaseModel):
             error=e.get("error", ""),
             scope_hash=e.get("scope_hash", ""),
             workspace=e.get("workspace", ""),
+            artifacts_deleted_at=(
+                datetime.fromisoformat(e["artifacts_deleted_at"])
+                if e.get("artifacts_deleted_at") else None
+            ),
         )
 
 

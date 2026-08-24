@@ -74,6 +74,10 @@ export class ApiService {
   getResultsSummary(scanId: string): Observable<any> {
     return this.http.get<any>(`${this.base}/results/${scanId}/summary`);
   }
+  /** Delete filesystem artifacts while retaining assessment records in SQLite. */
+  deleteRawOutputs(scanId: string): Observable<{ files_deleted: number; bytes_freed: number; database_records_retained: boolean }> {
+    return this.http.delete<{ files_deleted: number; bytes_freed: number; database_records_retained: boolean }>(`${this.base}/results/${scanId}/artifacts`);
+  }
 
   getInventory(scanId: string): Observable<InventorySnapshot> {
     return this.http.get<InventorySnapshot>(`${this.base}/inventory/${scanId}`);
