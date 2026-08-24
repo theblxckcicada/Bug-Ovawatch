@@ -155,13 +155,18 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         asyncio.run(storage.save_auth(record))
+        admin = {
+            "id": "admin", "username": "admin", "role": "administrator",
+            **auth_lib.hash_password(password),
+        }
+        asyncio.run(storage.save_control_record("user", "admin", admin))
     except OSError as exc:
-        logger.error("Failed to write auth record under %s: %s", output_dir, exc)
+        logger.error("Failed to write auth record under %s: %s", database_dir, exc)
         return 1
 
     rotated = not (args.keep_sessions and existing.get("secret"))
     action = "reset" if existing.get("hash") else "initialised"
-    logger.info("Password %s. Auth record written to %s", action, output_dir / ".meta" / "auth.json")
+    logger.info("Password %s. Auth record written to %s", action, storage.database_path)
     if rotated:
         logger.info("Token-signing secret rotated — all existing sessions are logged out.")
     return 0

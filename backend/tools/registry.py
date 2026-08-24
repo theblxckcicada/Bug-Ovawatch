@@ -25,6 +25,7 @@ from tools.vuln.nuclei           import NucleiTool
 from tools.vuln.cve_check        import CveCheckTool
 from tools.vuln.secret_exposure  import SecretExposureTool
 from tools.vuln.web_posture      import WebPostureTool
+from tools.vuln.origin_exposure  import OriginExposureTool
 from tools.vuln.subdomain_takeover import SubdomainTakeoverTool
 from tools.vuln.wpscan           import WpscanTool
 from tools.screenshots.gowitness import GowitnessTool
@@ -65,6 +66,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     "cve_check":    CveCheckTool,
     "secret_exposure": SecretExposureTool,
     "web_posture":  WebPostureTool,
+    "origin_exposure": OriginExposureTool,
     "subdomain_takeover": SubdomainTakeoverTool,
     "wpscan":       WpscanTool,
     # Screenshots & Tech

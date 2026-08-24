@@ -119,6 +119,21 @@ import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
       </div>
 
       <div class="card" style="max-width:960px;margin-top:16px">
+        <h3 class="section-title">Users and roles</h3>
+        <p class="section-copy">Administrators manage users, analysts can operate assessments, and viewers have read-only access.</p>
+        <div class="user-grid"><input class="form-input" [(ngModel)]="newUsername" placeholder="Username" /><input class="form-input" type="password" [(ngModel)]="newUserPassword" placeholder="Password" /><select class="form-input" [(ngModel)]="newUserRole"><option value="analyst">Analyst</option><option value="viewer">Viewer</option><option value="administrator">Administrator</option></select><button class="btn btn-outline btn-sm" (click)="addUser()">Add user</button></div>
+        @for (user of users(); track user.username) { <div class="about-row"><span>{{user.username}} · {{user.role}}</span>@if (user.username !== 'admin') { <button class="btn btn-ghost btn-sm" (click)="removeUser(user.username)">Remove</button> }</div> }
+      </div>
+
+      <div class="card" style="max-width:960px;margin-top:16px">
+        <h3 class="section-title">Change notifications</h3>
+        <p class="section-copy">Send deduplicated assessment delta summaries to a Slack, Discord, or generic webhook.</p>
+        <div class="two-col"><input class="form-input" [(ngModel)]="webhookName" placeholder="Channel name" /><input class="form-input" [(ngModel)]="webhookUrl" placeholder="https://…" /></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" (click)="addWebhook()">Add webhook</button>
+        @for (channel of notifications(); track channel.id) { <div class="about-row"><span>{{channel.name}}</span><button class="btn btn-ghost btn-sm" (click)="removeWebhook(channel.id)">Remove</button></div> }
+      </div>
+
+      <div class="card" style="max-width:960px;margin-top:16px">
         <h3 class="section-title">System Health</h3>
         <p class="section-copy">Local database, storage capacity, and scanner readiness.</p>
         @if (system(); as status) {
@@ -163,6 +178,7 @@ import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
     details summary { cursor:pointer; color:var(--text-dim); font-size:12px; }
     .tool-health { display:grid; gap:7px; margin-top:10px; }
     .tool-health div { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-dim); }
+    .user-grid { display:grid;grid-template-columns:1fr 1fr 150px auto;gap:8px;margin-bottom:12px; }
     @media (max-width: 900px) { .settings-grid, .two-col { grid-template-columns:1fr; } .ai-card { max-width:none; } }
   `]
 })
@@ -177,12 +193,21 @@ export class SettingsComponent implements OnInit {
   keysSaving = signal(false);
   keysSaved = signal(false);
   keysError = signal('');
+  notifications = signal<any[]>([]);
+  webhookName = '';
+  webhookUrl = '';
+  users = signal<any[]>([]);
+  newUsername = '';
+  newUserPassword = '';
+  newUserRole = 'analyst';
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.api.getToolApiKeys().subscribe(c => { this.apiKeys = { ...this.apiKeys, ...c }; });
     this.api.getSystemStatus().subscribe({ next: status => this.system.set(status), error: () => {} });
+    this.api.getNotifications().subscribe(rows => this.notifications.set(rows));
+    this.api.getUsers().subscribe({next: rows => this.users.set(rows), error: () => {}});
   }
 
   missingTools() { return this.system()?.tools.filter(tool => !tool.available) || []; }
@@ -194,5 +219,29 @@ export class SettingsComponent implements OnInit {
       next: () => { this.keysSaving.set(false); this.keysSaved.set(true); this.api.getToolApiKeys().subscribe(c => this.apiKeys = { ...this.apiKeys, ...c }); setTimeout(() => this.keysSaved.set(false), 3000); },
       error: e => { this.keysSaving.set(false); this.keysError.set(e.message || 'Save failed'); },
     });
+  }
+
+  addWebhook() {
+    if (!this.webhookName.trim() || !this.webhookUrl.trim()) return;
+    this.api.createNotification(this.webhookName.trim(), this.webhookUrl.trim()).subscribe(channel => {
+      this.notifications.update(rows => [...rows, channel]); this.webhookName=''; this.webhookUrl='';
+    });
+  }
+
+  removeWebhook(id: string) {
+    this.api.deleteNotification(id).subscribe(() =>
+      this.notifications.update(rows => rows.filter(channel => channel.id !== id)));
+  }
+
+  addUser() {
+    if (!this.newUsername.trim() || this.newUserPassword.length < 8) return;
+    this.api.createUser(this.newUsername.trim(), this.newUserPassword, this.newUserRole).subscribe(user => {
+      this.users.update(rows => [...rows, user]); this.newUsername=''; this.newUserPassword='';
+    });
+  }
+
+  removeUser(username: string) {
+    this.api.deleteUser(username).subscribe(() =>
+      this.users.update(rows => rows.filter(user => user.username !== username)));
   }
 }

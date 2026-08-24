@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import secrets
 import time
+import json
 from typing import Any
 
 # PBKDF2 cost. 200k SHA-256 iterations is a sensible 2024-era default for an
@@ -81,18 +82,42 @@ def issue_token(secret: str, ttl: int = TOKEN_TTL_SECONDS) -> str:
     return f"{expiry}.{signature}"
 
 
+def issue_identity_token(
+    secret: str, subject: str, role: str, ttl: int = TOKEN_TTL_SECONDS,
+) -> str:
+    """Issue a signed identity token carrying a global ShadowGrid role."""
+    payload = _b64e(json.dumps({
+        "exp": int(time.time()) + ttl, "sub": subject, "role": role,
+    }, separators=(",", ":")).encode())
+    return f"{payload}.{_sign(secret, payload)}"
+
+
+def token_claims(secret: str, token: str | None) -> dict[str, Any] | None:
+    """Validate an identity or legacy token and return normalized claims."""
+    if not token or not secret or "." not in token:
+        return None
+    payload, _, signature = token.partition(".")
+    if not hmac.compare_digest(signature, _sign(secret, payload)):
+        return None
+    try:
+        claims = json.loads(_b64d(payload))
+        if int(claims.get("exp", 0)) <= int(time.time()):
+            return None
+        if claims.get("role") not in {"administrator", "analyst", "viewer"}:
+            return None
+        return claims
+    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+        try:
+            if int(payload) > int(time.time()):
+                return {"exp": int(payload), "sub": "legacy-admin", "role": "administrator"}
+        except ValueError:
+            pass
+        return None
+
+
 def verify_token(secret: str, token: str | None) -> bool:
     """Validate an issued token: correct signature and not yet expired."""
-    if not token or not secret or "." not in token:
-        return False
-    expiry, _, signature = token.partition(".")
-    expected = _sign(secret, expiry)
-    if not hmac.compare_digest(signature, expected):
-        return False
-    try:
-        return int(expiry) > int(time.time())
-    except ValueError:
-        return False
+    return token_claims(secret, token) is not None
 
 
 def _sign(secret: str, payload: str) -> str:

@@ -39,6 +39,7 @@ def _enforce_login_rate_limit(client_ip: str) -> None:
 
 class PasswordBody(BaseModel):
     password: str = Field(min_length=1)
+    username: str = Field(default="admin", min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_.-]+$")
 
 
 def _get_storage():
@@ -50,7 +51,7 @@ async def _load_record() -> dict:
     return await _get_storage().load_auth()
 
 
-async def require_auth(request: Request) -> None:
+async def require_auth(request: Request) -> dict:
     """FastAPI dependency that rejects unauthenticated requests.
 
     Accepts the bearer token from the Authorization header or a ``token`` query
@@ -69,8 +70,13 @@ async def require_auth(request: Request) -> None:
     if not token:
         token = request.query_params.get("token")
 
-    if not auth_lib.verify_token(secret, token):
+    claims = auth_lib.token_claims(secret, token)
+    if not claims:
         raise HTTPException(401, "Invalid or expired token")
+    if claims["role"] == "viewer" and request.method not in {"GET", "HEAD", "OPTIONS"}:
+        raise HTTPException(403, "Viewer accounts are read-only")
+    request.state.principal = claims
+    return claims
 
 
 @router.get("/status")
@@ -93,7 +99,12 @@ async def auth_setup(body: PasswordBody):
     secret = auth_lib.new_secret()
     new_record = {**auth_lib.hash_password(body.password), "secret": secret}
     await storage.save_auth(new_record)
-    return {"token": auth_lib.issue_token(secret)}
+    user = {
+        "id": "admin", "username": "admin", "role": "administrator",
+        **auth_lib.hash_password(body.password),
+    }
+    await storage.save_control_record("user", "admin", user)
+    return {"token": auth_lib.issue_identity_token(secret, "admin", "administrator"), "role": "administrator"}
 
 
 @router.post("/login")
@@ -104,9 +115,53 @@ async def auth_login(body: PasswordBody, request: Request):
 
     client_ip = request.client.host if request.client else "unknown"
     _enforce_login_rate_limit(client_ip)
-    if not auth_lib.verify_password(body.password, record):
+    user = await _get_storage().get_control_record("user", body.username.lower())
+    password_record = user or (record if body.username.lower() == "admin" else {})
+    if not auth_lib.verify_password(body.password, password_record):
         _failed_logins[client_ip].append(time.monotonic())
         raise HTTPException(401, "Invalid password")
 
     _failed_logins.pop(client_ip, None)
-    return {"token": auth_lib.issue_token(record["secret"])}
+    role = str((user or {}).get("role", "administrator"))
+    return {
+        "token": auth_lib.issue_identity_token(record["secret"], body.username.lower(), role),
+        "role": role,
+    }
+
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_.-]+$")
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=256)
+    role: str = Field(pattern=r"^(administrator|analyst|viewer)$")
+
+
+async def require_administrator(request: Request) -> dict:
+    claims = await require_auth(request)
+    if claims["role"] != "administrator":
+        raise HTTPException(403, "Administrator role required")
+    return claims
+
+
+@router.get("/users")
+async def list_users(_: dict = Depends(require_administrator)):
+    users = await _get_storage().list_control_records("user")
+    return [{key: value for key, value in user.items() if key not in {"hash", "salt", "iterations"}} for user in users]
+
+
+@router.post("/users", status_code=201)
+async def create_user(body: UserCreate, _: dict = Depends(require_administrator)):
+    storage = _get_storage()
+    username = body.username.lower()
+    if await storage.get_control_record("user", username):
+        raise HTTPException(409, "Username already exists")
+    user = {"id": username, "username": username, "role": body.role, **auth_lib.hash_password(body.password)}
+    await storage.save_control_record("user", username, user)
+    return {"id": username, "username": username, "role": body.role}
+
+
+@router.delete("/users/{username}", status_code=204)
+async def delete_user(username: str, claims: dict = Depends(require_administrator)):
+    normalized = username.lower()
+    if normalized in {"admin", claims["sub"]}:
+        raise HTTPException(409, "The bootstrap or current administrator cannot be deleted")
+    await _get_storage().delete_control_record("user", normalized)

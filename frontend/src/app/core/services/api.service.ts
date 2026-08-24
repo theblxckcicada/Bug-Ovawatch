@@ -132,6 +132,10 @@ export class ApiService {
     return `${this.base}/reports/${scanId}/graph${suffix}`;
   }
 
+  getAttackGraph(scanId: string): Observable<{nodes: any[]; edges: any[]}> {
+    return this.http.get<{nodes: any[]; edges: any[]}>(`${this.base}/reports/${scanId}/graph`);
+  }
+
   getSchedules(projectId: string): Observable<ScanSchedule[]> {
     return this.http.get<ScanSchedule[]>(`${this.base}/control/schedules?project_id=${encodeURIComponent(projectId)}`);
   }
@@ -150,6 +154,28 @@ export class ApiService {
     return this.http.put(`${this.base}/control/finding-states/${findingId}`, {
       project_id: projectId, disposition, assignee: '', tags: [], notes: '', severity_override: '',
     });
+  }
+
+  getNotifications(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/control/notifications`);
+  }
+
+  createNotification(name: string, webhookUrl: string): Observable<any> {
+    return this.http.post(`${this.base}/control/notifications`, {
+      name, webhook_url: webhookUrl, minimum_severity: 'medium', enabled: true,
+    });
+  }
+
+  deleteNotification(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/control/notifications/${id}`);
+  }
+
+  getUsers(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/auth/users`); }
+  createUser(username: string, password: string, role: string): Observable<any> {
+    return this.http.post(`${this.base}/auth/users`, {username, password, role});
+  }
+  deleteUser(username: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/auth/users/${encodeURIComponent(username)}`);
   }
 
   /** Token as an extra query param — artifacts load via <img>/<a>, which can't set headers. */

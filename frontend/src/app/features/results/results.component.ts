@@ -6,7 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { InventoryDelta, InventorySnapshot, ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'inventory'|'changes'|'evidence'|'assessment'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'emails'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'inventory'|'graph'|'changes'|'evidence'|'assessment'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'emails'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -20,6 +20,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   results = signal<ToolResult[]>([]);
   inventory = signal<InventorySnapshot | null>(null);
   inventoryDelta = signal<InventoryDelta | null>(null);
+  attackGraph = signal<{nodes: any[]; edges: any[]} | null>(null);
   loading = signal(true);
   scanStatus = signal<string>('');
   artifactsDeletedAt = signal<string | null>(null);
@@ -43,6 +44,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   tabs = [
     {id:'overview' as TabId, label:'Overview'},
     {id:'inventory' as TabId, label:'Assets'},
+    {id:'graph' as TabId, label:'Graph'},
     {id:'vulns' as TabId, label:'Findings'},
     {id:'changes' as TabId, label:'Changes'},
     {id:'evidence' as TabId, label:'Evidence'},
@@ -116,7 +118,19 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
       next: delta => this.inventoryDelta.set(delta),
       error: () => {},
     });
+    this.api.getAttackGraph(this.scanId).subscribe({
+      next: graph => this.attackGraph.set(graph),
+      error: () => {},
+    });
   }
+
+  graphGroups = computed(() => {
+    const grouped = new Map<string, any[]>();
+    for (const node of this.attackGraph()?.nodes || []) {
+      grouped.set(node.type, [...(grouped.get(node.type) || []), node]);
+    }
+    return [...grouped.entries()].map(([type, nodes]) => ({type, nodes}));
+  });
 
   inventoryByType = computed(() => {
     const counts = new Map<string, number>();
@@ -355,6 +369,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   tabCount(t: TabId): number {
     const m: Record<TabId,number> = {
       overview:0, inventory:this.inventory()?.assets.length || 0,
+      graph:this.attackGraph()?.nodes.length || 0,
       changes:(this.inventoryDelta()?.added_assets.length || 0) + (this.inventoryDelta()?.new_findings.length || 0),
       evidence:this.results().reduce((sum,result)=>sum+result.count,0), assessment:this.results().length,
       subdomains:this.subdomains().length, dns:this.dnsRecords().length,

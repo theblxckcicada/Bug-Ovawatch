@@ -1,6 +1,7 @@
 """Storage and tool API key configuration management."""
 from __future__ import annotations
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from api.auth import require_administrator
 
 from models import ToolApiKeysConfig
 from tool_secrets import apply_tool_api_keys, mask_tool_api_keys, merge_tool_api_keys
@@ -20,7 +21,9 @@ async def get_tool_api_keys():
 
 
 @router.post("/api-keys")
-async def save_tool_api_keys(body: ToolApiKeysConfig):
+async def save_tool_api_keys(
+    body: ToolApiKeysConfig, _: dict = Depends(require_administrator),
+):
     storage = _get_storage()
     existing = await storage.load_tool_api_keys()
     cfg = merge_tool_api_keys(existing, body.model_dump())

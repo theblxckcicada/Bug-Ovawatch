@@ -32,6 +32,9 @@ import { AuthService } from '../../core/services/auth.service';
           <p class="sub">Sign in to your AppSec workspace.</p>
         }
 
+        @if (mode() === 'login') {
+          <div class="form-group"><label class="form-label">Username</label><input class="form-input" [(ngModel)]="username" autocomplete="username" /></div>
+        }
         <div class="form-group">
           <label class="form-label">Password</label>
           <input class="form-input" type="password" autocomplete="current-password"
@@ -72,6 +75,7 @@ import { AuthService } from '../../core/services/auth.service';
 export class LoginComponent implements OnInit {
   mode = signal<'login' | 'setup'>('login');
   password = '';
+  username = 'admin';
   confirm = '';
   busy = signal(false);
   error = signal('');
@@ -102,7 +106,7 @@ export class LoginComponent implements OnInit {
     this.busy.set(true);
     const op = this.mode() === 'setup'
       ? this.auth.setup(this.password)
-      : this.auth.login(this.password);
+      : this.auth.login(this.password, this.username.trim() || 'admin');
 
     op.subscribe({
       next: () => this.router.navigate(['/projects']),

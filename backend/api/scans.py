@@ -135,6 +135,27 @@ async def cancel_scan_post(scan_id: str):
     return await _cancel(scan_id)
 
 
+@router.post("/{scan_id}/retry-failed", status_code=201)
+async def retry_failed_tools(scan_id: str, background_tasks: BackgroundTasks):
+    """Start a new assessment containing only tools that failed previously."""
+    storage = _get_storage()
+    scan = await storage.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+    failed_tools = sorted({
+        result.tool for result in await storage.list_results(scan_id) if result.error
+    })
+    if not failed_tools:
+        raise HTTPException(409, "No failed tools are available to retry")
+    return await create_scan(
+        ScanCreate(
+            project_id=scan.project_id, tools=failed_tools,
+            wordlist=scan.wordlist, verify_emails=scan.verify_emails,
+        ),
+        background_tasks,
+    )
+
+
 @router.delete("/{scan_id}", status_code=204)
 async def cancel_scan(scan_id: str):
     await _cancel(scan_id)

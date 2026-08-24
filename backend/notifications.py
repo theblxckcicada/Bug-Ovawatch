@@ -44,6 +44,14 @@ async def notify_scan_completed(scan: Scan, storage) -> None:
             "resolved_findings": len(delta.resolved_findings),
         },
     }
+    message = (
+        f"ShadowGrid assessment {scan.id[:8]} completed: "
+        f"{len(delta.new_findings)} new finding(s), "
+        f"{len(delta.added_assets)} new asset(s), "
+        f"{len(delta.resolved_findings)} resolved finding(s)."
+    )
+    payload["text"] = message
+    payload["content"] = message
     timeout = aiohttp.ClientTimeout(total=10)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         for record in await storage.list_control_records("notification"):

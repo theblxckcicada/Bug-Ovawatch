@@ -92,6 +92,27 @@
     }
 
     <!-- ── SUBDOMAINS ── -->
+    @if (activeTab() === 'graph') {
+      @if (attackGraph(); as graph) {
+        <div class="graph-board">
+          @for (group of graphGroups(); track group.type) {
+            <section class="graph-column">
+              <div class="section-head"><span class="section-title">{{group.type}}</span><span class="section-count">{{group.nodes.length}}</span></div>
+              @for (node of group.nodes; track node.id) {
+                <div class="graph-node" [class.has-risk]="node.finding_count > 0" [title]="node.states.join(', ')">
+                  <span>{{node.label}}</span><b>{{node.attributes?.ownership_score ?? 0}}%</b>
+                  @if (node.finding_count) { <small>{{node.finding_count}} finding(s)</small> }
+                </div>
+              }
+            </section>
+          }
+        </div>
+        <div class="card"><div class="section-head"><span class="section-title">Relationships</span><span class="section-count">{{graph.edges.length}}</span></div>
+          @for (edge of graph.edges; track edge.id) { <div class="top-finding"><span class="badge badge-tool">{{edge.type}}</span><span class="tf-name td-mono">{{edge.source_asset_id.slice(0,8)}} → {{edge.target_asset_id.slice(0,8)}}</span><span class="tf-host">{{edge.sources.join(', ')}}</span></div> }
+        </div>
+      } @else { <div class="empty-state"><p>Graph data becomes available after inventory correlation completes.</p></div> }
+    }
+
     @if (activeTab() === 'changes') {
       @if (inventoryDelta(); as delta) {
         <div class="stat-grid">

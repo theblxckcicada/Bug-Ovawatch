@@ -30,9 +30,9 @@ export class AuthService {
       .pipe(tap(res => this.store(res.token)));
   }
 
-  login(password: string): Observable<{ token: string }> {
+  login(password: string, username = 'admin'): Observable<{ token: string }> {
     return this.http
-      .post<{ token: string }>(`${this.base}/login`, { password })
+      .post<{ token: string }>(`${this.base}/login`, { password, username })
       .pipe(tap(res => this.store(res.token)));
   }
 

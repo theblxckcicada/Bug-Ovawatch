@@ -46,6 +46,15 @@ async def lifespan(app: FastAPI):
         await storage.save_tool_api_keys(normalized_tool_keys)
     apply_tool_api_keys(normalized_tool_keys)
 
+    auth_record = await storage.load_auth()
+    if auth_record.get("hash") and not await storage.get_control_record("user", "admin"):
+        await storage.save_control_record("user", "admin", {
+            "id": "admin", "username": "admin", "role": "administrator",
+            "algorithm": auth_record.get("algorithm", "pbkdf2_sha256"),
+            "iterations": auth_record.get("iterations", "200000"),
+            "salt": auth_record.get("salt", ""), "hash": auth_record.get("hash", ""),
+        })
+
     # Background tasks are process-local. Mark interrupted runs explicitly so a
     # restart never leaves an assessment permanently displayed as running.
     from datetime import datetime, timezone

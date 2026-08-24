@@ -39,6 +39,14 @@ It's built for **security teams, penetration testers, and bug-bounty hunters** w
 - **Scope-aware** — out-of-scope patterns (incl. wildcards) are filtered at every stage, so results stay inside your authorisation.
 - **SQL-first persistence** — mandatory local SQLite storage with transactions,
   foreign keys, WAL concurrency, and automatic migration from legacy JSON metadata.
+- **Continuous monitoring** — durable daily, weekly, or monthly schedules,
+  inventory drift, deduplicated webhook notifications, and failed-tool retries.
+- **Finding workflow** — triage dispositions, assignees/tags/notes APIs,
+  suppression rules, severity overrides, and automatic reopening on recurrence.
+- **Portable reporting** — HTML/print-to-PDF, Markdown, CSV, JSON, and SARIF
+  exports plus a relationship graph backed by the normalized SQL inventory.
+- **Role-based access** — administrator and analyst accounts plus read-only
+  viewers; existing installations are migrated to the `admin` account.
 
 ---
 
@@ -212,6 +220,11 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | naabu | Port scanning |
 | nuclei | Template-based vulnerability scanning |
 | cve_check | CVE-tagged Nuclei checks against verified alive URLs |
+| ffuf | Opt-in bounded content discovery against alive services |
+| wafw00f | WAF and reverse-proxy fingerprinting |
+| web_posture | Native security header, cookie, and CORS posture checks |
+| secret_exposure | Masked public secret-exposure detection |
+| origin_exposure | Direct-origin reachability and response-correlation checks |
 | shodan | Optional Shodan service and reported-CVE enrichment |
 | email_finder | Hunter domain email discovery with optional deliverability verification |
 | subzy | Subdomain-takeover detection (secondary engine) |

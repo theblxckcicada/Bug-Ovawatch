@@ -131,10 +131,25 @@ async def system_status():
     storage = _storage()
     disk = shutil.disk_usage(settings.output_dir)
     tools = []
+    health: dict[str, dict[str, float | int]] = {}
+    for project in await storage.list_projects():
+        for scan in await storage.list_scans(project.id):
+            for result in await storage.list_results(scan.id):
+                row = health.setdefault(result.tool, {"runs": 0, "failures": 0, "total_seconds": 0.0})
+                row["runs"] += 1
+                row["failures"] += int(bool(result.error))
+                row["total_seconds"] += result.elapsed_s
     for metadata in list_tools():
         tool = get_tool(metadata["name"], Path(settings.output_dir), Path(settings.data_dir))
         error = tool.availability_error() if tool else "Tool is not registered"
-        tools.append({"name": metadata["name"], "available": error is None, "reason": error or ""})
+        stats = health.get(metadata["name"], {"runs": 0, "failures": 0, "total_seconds": 0.0})
+        runs = int(stats["runs"])
+        tools.append({
+            "name": metadata["name"], "available": error is None, "reason": error or "",
+            "runs": runs, "failures": int(stats["failures"]),
+            "failure_rate": round(int(stats["failures"]) / runs, 3) if runs else 0,
+            "average_seconds": round(float(stats["total_seconds"]) / runs, 2) if runs else 0,
+        })
     return {
         "database": str(storage.database_path),
         "database_size": storage.database_path.stat().st_size,

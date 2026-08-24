@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 
+import auth
+
 from control_models import FindingDisposition, FindingState
 from finding_workflow import reopen_reappearing_findings
 from inventory import InventoryFinding, InventorySnapshot
@@ -29,6 +31,16 @@ def test_control_records_are_durable_and_project_scoped(tmp_path) -> None:
         assert await storage.get_control_record("audit", "event-1") is None
 
     asyncio.run(exercise())
+
+
+def test_identity_tokens_carry_role_and_legacy_tokens_remain_valid() -> None:
+    secret = auth.new_secret()
+    token = auth.issue_identity_token(secret, "reader", "viewer", ttl=60)
+    claims = auth.token_claims(secret, token)
+    assert claims is not None
+    assert claims["sub"] == "reader"
+    assert claims["role"] == "viewer"
+    assert auth.verify_token(secret, auth.issue_token(secret, ttl=60))
 
 
 def test_remediated_finding_reopens_when_observed_again(tmp_path) -> None:

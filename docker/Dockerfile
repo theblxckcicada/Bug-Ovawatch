@@ -146,7 +146,7 @@ RUN gem install wpscan --no-document 2>&1 \
 WORKDIR /app
 COPY backend/ ./backend/
 RUN pip3 install --no-cache-dir -r backend/requirements.txt
-RUN pip3 install --no-cache-dir wafw00f==2.3.2
+RUN pip3 install --no-cache-dir wafw00f==2.4.2
 
 # All Go binaries from staging. Copy after pip install so Python console scripts
 # cannot overwrite ProjectDiscovery binaries such as httpx. The PD binary is
