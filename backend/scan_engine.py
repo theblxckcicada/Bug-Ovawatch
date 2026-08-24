@@ -43,7 +43,7 @@ _reuse_maps: dict[str, dict[tuple[str, str], ToolResult]] = {}
 _tool_semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_tool_groups))
 
 PHASES: list[dict[str, object]] = [
-    {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap", "shodan"]},
+    {"index": 1, "name": "Asset Discovery", "tools": ["whois", "asnmap", "shodan", "email_finder"]},
     {"index": 2, "name": "Subdomain Enumeration", "tools": ["crtsh", "assetfinder", "subfinder", "amass", "shuffledns"]},
     {"index": 3, "name": "DNS Resolution", "tools": ["dnsx", "dns_records", "zone_transfer"]},
     {"index": 4, "name": "HTTP, TLS & Port Validation", "tools": ["httpx", "tlsx", "naabu"]},
@@ -297,6 +297,7 @@ def _write_execution_manifest(scan: Scan, workspace: Path, domains: list[str],
         "out_of_scope": sorted(oos),
         "selected_tools": scan.tools,
         "wordlist": scan.wordlist,
+        "verify_emails": scan.verify_emails,
         "started_at": scan.started_at.isoformat() if scan.started_at else None,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "tool_results": [
@@ -483,7 +484,10 @@ async def _run_tool(
     )
 
     try:
-        result = await tool.execute(domain, scan.id, scan.project_id, oos, wordlist)
+        result = await tool.execute(
+            domain, scan.id, scan.project_id, oos, wordlist,
+            extra={"verify_emails": scan.verify_emails},
+        )
         from evidence import persist_result_evidence
         await persist_result_evidence(result, output_dir, storage)
         await storage.save_result(result)
@@ -620,7 +624,10 @@ async def run_scan(
     workspace_root = scan_workspace(output_dir, scan.project_id, scan.id)
     workspace_root.mkdir(parents=True, exist_ok=True)
     scan.workspace = str(workspace_root.relative_to(output_dir.resolve())).replace("\\", "/")
-    scan.scope_hash = scope_fingerprint(domains, oos, scan.tools, scan.wordlist)
+    scan.scope_hash = scope_fingerprint(
+        domains, oos, scan.tools, scan.wordlist,
+        {"verify_emails": scan.verify_emails},
+    )
 
     if reuse_previous:
         _reuse_maps[scan.id] = await _build_reuse_map(scan, storage)

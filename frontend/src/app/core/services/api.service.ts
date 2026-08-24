@@ -45,9 +45,9 @@ export class ApiService {
   }
 
   // ── Scans ─────────────────────────────────────────────────────
-  startScan(projectId: string, tools: string[], wordlist?: string, reusePrevious = false): Observable<Scan> {
+  startScan(projectId: string, tools: string[], wordlist?: string, reusePrevious = false, verifyEmails = false): Observable<Scan> {
     return this.http.post<Scan>(`${this.base}/scans/`, {
-      project_id: projectId, tools, wordlist, reuse_previous: reusePrevious,
+      project_id: projectId, tools, wordlist, reuse_previous: reusePrevious, verify_emails: verifyEmails,
     });
   }
   getScans(projectId: string): Observable<Scan[]> {

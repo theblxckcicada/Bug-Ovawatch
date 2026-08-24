@@ -163,7 +163,7 @@ The whole stack ships as a **single container** — Angular build, FastAPI backe
 
 | Phase | Tools | Execution |
 |-------|-------|-----------|
-| 1 — Asset Discovery | `whois`, `asnmap`, optional `shodan` | parallel |
+| 1 — Asset Discovery | `whois`, `asnmap`, optional `shodan`, optional `email_finder` | parallel |
 | 2 — Subdomain Enumeration | `crtsh`, `assetfinder`, `subfinder`, `amass`, `shuffledns` | **all parallel** |
 | 3 — DNS Resolution | `dnsx`, `dns_records`, `zone_transfer` | parallel |
 | 4 — HTTP, TLS & Port Validation | `httpx`, `tlsx`, `naabu` | parallel |
@@ -189,6 +189,10 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
   a Shodan API key is saved in Settings, performs one scoped hostname search per
   root domain, rejects out-of-scope hostnames, and correlates returned services,
   CPEs, IPs, and reported CVEs. Filtered Shodan searches may consume API credits.
+- **Email discovery** is opt-in per assessment and requires a Hunter API key in
+  Settings. It performs a scoped Domain Search for up to 10 addresses per root
+  domain. Email Verifier calls are controlled by a separate assessment checkbox
+  because each discovered address may consume an additional verification credit.
 - **AI analysis** summarises findings when an AI provider key (OpenAI / Anthropic / Google / DeepSeek / Groq) is configured in Settings. With more than one in-scope asset, a **separate analysis is produced per asset**.
 
 ---
@@ -209,6 +213,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 | nuclei | Template-based vulnerability scanning |
 | cve_check | CVE-tagged Nuclei checks against verified alive URLs |
 | shodan | Optional Shodan service and reported-CVE enrichment |
+| email_finder | Hunter domain email discovery with optional deliverability verification |
 | subzy | Subdomain-takeover detection (secondary engine) |
 | wpscan | WordPress vulnerability checks across every verified alive HTTP service |
 | gowitness | Web screenshots |

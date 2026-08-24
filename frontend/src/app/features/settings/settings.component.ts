@@ -62,6 +62,12 @@ import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
             <input class="form-input" type="password" [(ngModel)]="apiKeys.serpapi_api_key" placeholder="Enables Google dorking through SerpApi" />
             <span class="hint">Stored as <span class="mono">SERPAPI_API_KEY</span>. Without it, dorking falls back to DuckDuckGo.</span>
           </div>
+
+          <div class="form-group">
+            <label class="form-label">Hunter API Key</label>
+            <input class="form-input" type="password" [(ngModel)]="apiKeys.hunter_api_key" placeholder="Enables domain email discovery and optional verification" />
+            <span class="hint">Stored as <span class="mono">HUNTER_API_KEY</span>. Email verification is opt-in per assessment and may consume additional Hunter credits.</span>
+          </div>
         </div>
 
         <div class="card ai-card">
@@ -164,7 +170,7 @@ export class SettingsComponent implements OnInit {
   system = signal<SystemStatus | null>(null);
   apiKeys: ToolApiKeysConfig = {
     pdcp_api_key:'', github_token:'', shodan_api_key:'', censys_api_id:'', censys_api_secret:'', chaos_key:'',
-    wpscan_api_token:'', serpapi_api_key:'',
+    wpscan_api_token:'', serpapi_api_key:'', hunter_api_key:'',
     openai_api_key:'', anthropic_api_key:'', google_ai_api_key:'', deepseek_api_key:'', groq_api_key:''
   };
 

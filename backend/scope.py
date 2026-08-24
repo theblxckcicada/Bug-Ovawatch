@@ -65,14 +65,18 @@ def scan_workspace(output_dir: Path, project_id: str, scan_id: str) -> Path:
     return workspace
 
 
-def scope_fingerprint(domains: list[str], oos: list[str], tools: list[str], wordlist: str | None) -> str:
+def scope_fingerprint(
+    domains: list[str], oos: list[str], tools: list[str], wordlist: str | None,
+    options: dict[str, object] | None = None,
+) -> str:
     """Create a deterministic fingerprint for scope-sensitive result reuse."""
     payload = {
         "domains": sorted(domains),
         "oos": sorted(oos),
         "tools": sorted(set(tools)),
         "wordlist": wordlist or "",
-        "schema": 1,
+        "options": options or {},
+        "schema": 2,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()

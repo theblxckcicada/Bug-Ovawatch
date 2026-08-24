@@ -24,6 +24,7 @@ class AssetType(str, Enum):
     URL = "url"
     SERVICE = "service"
     TECHNOLOGY = "technology"
+    EMAIL = "email"
 
 
 class InventoryAsset(BaseModel):
@@ -268,6 +269,25 @@ def build_inventory(scan_id: str, project_id: str, roots: Iterable[str],
                         continue
                     tech_asset = upsert_asset(AssetType.TECHNOLOGY, name, result.tool, "detected")
                     relate(host_asset, tech_asset, "uses_technology", result.tool)
+
+            email = str(row.get("email") or "").strip().lower()
+            if result.category == ToolCategory.EMAIL and email:
+                email_asset = upsert_asset(
+                    AssetType.EMAIL,
+                    email,
+                    result.tool,
+                    state,
+                    {
+                        "full_name": row.get("full_name", ""),
+                        "position": row.get("position", ""),
+                        "department": row.get("department", ""),
+                        "verification_status": row.get("verification_status", ""),
+                        "verification_score": row.get("verification_score"),
+                    },
+                )
+                observe(email_asset, result.tool, state, row)
+                if root_asset:
+                    relate(root_asset, email_asset, "has_email_contact", result.tool)
 
             reported_vulnerabilities = row.get("vulnerabilities") or []
             if isinstance(reported_vulnerabilities, str):

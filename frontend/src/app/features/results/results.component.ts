@@ -6,7 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { InventoryDelta, InventorySnapshot, ToolResult } from '../../core/models';
 import Chart from 'chart.js/auto';
 
-type TabId = 'overview'|'inventory'|'changes'|'evidence'|'assessment'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'dorks'|'screenshots'|'ai';
+type TabId = 'overview'|'inventory'|'changes'|'evidence'|'assessment'|'subdomains'|'dns'|'http'|'vulns'|'wordpress'|'urls'|'tech'|'emails'|'dorks'|'screenshots'|'ai';
 
 @Component({
   selector: 'sg-results',
@@ -51,7 +51,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   evidenceTabs: Array<{id: TabId; label: string}> = [
     {id:'subdomains',label:'Subdomains'}, {id:'dns',label:'DNS'}, {id:'http',label:'HTTP & Ports'},
     {id:'wordpress',label:'WordPress'}, {id:'urls',label:'URLs'}, {id:'tech',label:'Technology'},
-    {id:'dorks',label:'Dorks'}, {id:'screenshots',label:'Screenshots'}, {id:'ai',label:'AI analysis'},
+    {id:'emails',label:'Emails'}, {id:'dorks',label:'Dorks'}, {id:'screenshots',label:'Screenshots'}, {id:'ai',label:'AI analysis'},
   ];
   severities = ['all','critical','high','medium','low','info'];
   COMMON_PORTS = new Set([80,443,8080,8443,22,21,25,3389,3306,5432,6379,27017]);
@@ -217,6 +217,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   urls         = computed(() => this.results().filter(r => r.category === 'url').flatMap(r => r.data));
   screenshots  = computed(() => this.byTool('gowitness'));
   dorks        = computed(() => this.byTool('google_dorks'));
+  emails       = computed(() => this.byTool('email_finder'));
   wpFindings   = computed(() => this.byTool('wpscan'));
   // One AI report per in-scope asset (each scanned domain produces its own row).
   aiReports    = computed(() => this.byTool('ai_analysis'));
@@ -358,7 +359,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
       evidence:this.results().reduce((sum,result)=>sum+result.count,0), assessment:this.results().length,
       subdomains:this.subdomains().length, dns:this.dnsRecords().length,
       http:this.httpResults().length, vulns:this.vulns().length, wordpress:this.wpFindings().length,
-      urls:this.urls().length, tech:this.techInventory().length, dorks:this.dorks().length,
+      urls:this.urls().length, tech:this.techInventory().length, emails:this.emails().length, dorks:this.dorks().length,
       screenshots:this.screenshots().length, ai:this.aiReports().length
     };
     return m[t] || 0;
@@ -374,12 +375,18 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (code >= 300) return 'badge-3xx';
     return 'badge-2xx';
   }
+  emailVerificationBadge(status: string): string {
+    if (status === 'valid') return 'badge-alive';
+    if (['invalid', 'disposable'].includes(status)) return 'badge-dead';
+    return 'badge-tool';
+  }
 
   // ── Export methods (no arrow functions in template) ─────────────
   exportSubdomains()  { this.exportTxt(this.filteredSubs().map((s: any) => s['host']), 'subdomains.txt'); }
   exportHttpUrls()    { this.exportTxt(this.filteredHttp().map((h: any) => h['url']), 'alive_urls.txt'); }
   exportAllUrls()     { this.exportTxt(this.filteredUrls().map((u: any) => u['url']), 'urls.txt'); }
   exportDorks()       { this.exportTxt(this.dorks().map((d: any) => d['dork']), 'google_dorks.txt'); }
+  exportEmails()      { this.exportTxt(this.emails().map((e: any) => e['email']), 'emails.txt'); }
   exportAiReport(report: any) {
     const md = report?.['markdown'] || '';
     const name = (report?.['domain'] || 'asset').toString().replace(/[^a-z0-9.-]+/gi, '_');

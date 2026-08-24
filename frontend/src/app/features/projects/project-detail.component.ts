@@ -21,7 +21,7 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'Vulnerability':         ['nuclei','cve_check','subdomain_takeover','wpscan'],
   'Screenshots, Dorks & Tech': ['gowitness','whatweb','google_dorks'],
   'URL Discovery':         ['waybackurls','gau','katana','urlfinder'],
-  'Asset Discovery':       ['whois','asnmap','shodan'],
+  'Asset Discovery':       ['whois','asnmap','shodan','email_finder'],
   'AI':                    ['ai_analysis'],
 };
 
@@ -167,9 +167,19 @@ const TOOL_GROUPS: Record<string, string[]> = {
                     @if (t === 'shodan' && !toolAvail(t)) {
                       <div class="ai-warning">Save a Shodan API key in Settings to enable Shodan enrichment.</div>
                     }
+                    @if (t === 'email_finder' && !toolAvail(t)) {
+                      <div class="ai-warning">Save a Hunter API key in Settings to enable email discovery.</div>
+                    }
                   }
                 </div>
               </div>
+            }
+
+            @if (selectedTools.has('email_finder')) {
+              <label class="verification-option">
+                <input type="checkbox" [(ngModel)]="verifyEmails" />
+                <span><b>Verify discovered emails with Hunter</b><small>Optional. Makes one Email Verifier request per discovered address and may consume verification credits.</small></span>
+              </label>
             }
 
             <div class="form-group" style="margin-top:16px">
@@ -305,6 +315,9 @@ const TOOL_GROUPS: Record<string, string[]> = {
     .tool-chk.unavail { opacity:.5; cursor:not-allowed; }
     .tool-name { font-family:var(--font-mono); font-size:12px; }
     .ai-warning { flex-basis:100%; font-size:11px; color:var(--sev-medium); padding:4px 2px; }
+    .verification-option { display:flex; align-items:flex-start; gap:10px; margin:4px 0 18px; padding:12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-elevated); cursor:pointer; }
+    .verification-option span { display:flex; flex-direction:column; gap:3px; font-size:12px; }
+    .verification-option small { color:var(--text-dim); line-height:1.4; }
     input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
     .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:200; }
     .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; max-width:460px; width:90%; }
@@ -332,6 +345,7 @@ export class ProjectDetailComponent implements OnInit {
   newTarget = '';
   newOos = '';
   customWordlist = '';
+  verifyEmails = false;
   selectedTools = new Set<string>(DEFAULT_TOOLS);
 
   inscope = computed(() => this.targets().filter((t: any) => !t.is_oos));
@@ -359,7 +373,7 @@ export class ProjectDetailComponent implements OnInit {
   }
 
   unavailableLabel(name: string): string {
-    return ['ai_analysis', 'shodan'].includes(name) ? 'needs API key' : 'unavailable';
+    return ['ai_analysis', 'shodan', 'email_finder'].includes(name) ? 'needs API key' : 'unavailable';
   }
 
   addTarget(isOos: boolean) {
@@ -416,7 +430,13 @@ export class ProjectDetailComponent implements OnInit {
   private startScan(reusePrevious: boolean) {
     if (this.inscope().length === 0) return;
     this.launching.set(true);
-    this.api.startScan(this.project()!.id, [...this.selectedTools], this.customWordlist || undefined, reusePrevious)
+    this.api.startScan(
+      this.project()!.id,
+      [...this.selectedTools],
+      this.customWordlist || undefined,
+      reusePrevious,
+      this.selectedTools.has('email_finder') && this.verifyEmails,
+    )
       .subscribe({
         next: scan => this.router.navigate(['/scan', scan.id, 'progress']),
         error: () => this.launching.set(false),

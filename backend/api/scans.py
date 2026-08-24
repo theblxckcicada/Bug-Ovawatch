@@ -60,7 +60,12 @@ async def create_scan(body: ScanCreate, background_tasks: BackgroundTasks):
             raise HTTPException(422, "Wordlist must be an existing file under the configured data directory")
         wordlist = str(candidate)
 
-    scan = Scan(project_id=body.project_id, tools=selected_tools, wordlist=wordlist)
+    scan = Scan(
+        project_id=body.project_id,
+        tools=selected_tools,
+        wordlist=wordlist,
+        verify_emails=body.verify_emails and "email_finder" in selected_tools,
+    )
     await storage.save_scan(scan)
 
     project.scan_count += 1

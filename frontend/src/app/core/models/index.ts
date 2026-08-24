@@ -29,6 +29,7 @@ export interface Scan {
   scope_hash: string;
   workspace: string;
   artifacts_deleted_at: string | null;
+  verify_emails: boolean;
 }
 
 export interface ToolInfo {
@@ -57,7 +58,7 @@ export interface ToolResult {
   error: string;
 }
 
-export type AssetType = 'domain' | 'hostname' | 'ip_address' | 'url' | 'service' | 'technology';
+export type AssetType = 'domain' | 'hostname' | 'ip_address' | 'url' | 'service' | 'technology' | 'email';
 
 export interface InventoryAsset {
   id: string;
@@ -182,6 +183,7 @@ export interface ToolApiKeysConfig {
   chaos_key: string;
   wpscan_api_token: string;
   serpapi_api_key: string;
+  hunter_api_key: string;
   openai_api_key: string;
   anthropic_api_key: string;
   google_ai_api_key: string;

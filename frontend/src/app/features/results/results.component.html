@@ -469,6 +469,37 @@
       }
     }
 
+    <!-- ── EMAIL INTELLIGENCE ── -->
+    @if (activeTab() === 'emails') {
+      @if (emails().length === 0) {
+        <div class="empty-state"><div class="empty-icon">&#64;</div><p>No email addresses discovered. Select Email Finder and configure a Hunter API key.</p></div>
+      } @else {
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="section-head" style="padding:14px 16px;border-bottom:1px solid var(--border)">
+            <span class="section-title">Domain Email Intelligence (Hunter)</span>
+            <button class="btn btn-outline btn-sm" (click)="exportEmails()">↓ Export emails</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Email</th><th>Contact</th><th>Position</th><th>Type</th><th>Confidence</th><th>Verification</th><th>Sources</th><th></th></tr></thead>
+            <tbody>
+              @for (email of emails(); track email['email']) {
+                <tr>
+                  <td class="td-mono">{{email['email']}}</td>
+                  <td>{{email['full_name'] || '—'}}</td>
+                  <td>{{email['position'] || email['department'] || '—'}}</td>
+                  <td>{{email['type'] || '—'}}</td>
+                  <td>{{email['confidence'] ?? '—'}}</td>
+                  <td><span class="badge" [class]="emailVerificationBadge(email['verification_status'])">{{email['verification_status']}}@if (email['verification_score'] != null) { · {{email['verification_score']}} }</span></td>
+                  <td>@if ((email['sources'] || []).length) { <a [href]="email['sources'][0]" target="_blank">view ({{email['sources'].length}})</a> } @else { — }</td>
+                  <td><button class="copy-btn" (click)="copyItem(email, 'email')">copy</button></td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        </div>
+      }
+    }
+
     <!-- ── GOOGLE DORKS ── -->
     @if (activeTab() === 'dorks') {
       @if (dorks().length === 0) {

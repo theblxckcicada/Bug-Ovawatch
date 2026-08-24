@@ -45,6 +45,7 @@ class ToolCategory(str, Enum):
     DORK         = "dork"
     WORDPRESS    = "wordpress"
     AI           = "ai"
+    EMAIL        = "email"
 
 
 class ResultSeverity(str, Enum):
@@ -181,6 +182,8 @@ class ScanCreate(BaseModel):
     # When True, reuse successful tool results from the project's most recent scan
     # instead of re-running those tools — lets a new scan continue prior work.
     reuse_previous: bool = False
+    # Hunter Email Verifier consumes separate credits, so it is always opt-in.
+    verify_emails: bool = False
 
 
 class ScanProgress(BaseModel):
@@ -214,6 +217,7 @@ class Scan(BaseModel):
     scope_hash: str = ""
     workspace: str = ""
     artifacts_deleted_at: Optional[datetime] = None
+    verify_emails: bool = False
 
     def to_table_entity(self) -> dict:
         import json
@@ -230,6 +234,7 @@ class Scan(BaseModel):
             "scope_hash": self.scope_hash,
             "workspace": self.workspace,
             "artifacts_deleted_at": self.artifacts_deleted_at.isoformat() if self.artifacts_deleted_at else "",
+            "verify_emails": self.verify_emails,
         }
 
     @staticmethod
@@ -251,6 +256,7 @@ class Scan(BaseModel):
                 datetime.fromisoformat(e["artifacts_deleted_at"])
                 if e.get("artifacts_deleted_at") else None
             ),
+            verify_emails=bool(e.get("verify_emails", False)),
         )
 
 
@@ -333,6 +339,7 @@ class ToolApiKeysConfig(BaseModel):
     chaos_key: str = ""
     wpscan_api_token: str = ""
     serpapi_api_key: str = ""
+    hunter_api_key: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_ai_api_key: str = ""

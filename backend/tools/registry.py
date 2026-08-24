@@ -32,6 +32,7 @@ from tools.urls.urlfinder        import UrlFinderTool
 from tools.asset.whois_tool      import WhoisTool
 from tools.asset.asnmap_tool     import AsnmapTool
 from tools.asset.shodan_tool     import ShodanTool
+from tools.asset.email_finder    import EmailFinderTool
 from tools.analysis.google_dorks  import GoogleDorksTool
 from tools.analysis.ai_analysis   import AIAnalysisTool
 
@@ -70,6 +71,7 @@ REGISTRY: dict[str, type[BaseTool]] = {
     "whois":        WhoisTool,
     "asnmap":       AsnmapTool,
     "shodan":       ShodanTool,
+    "email_finder": EmailFinderTool,
     "google_dorks": GoogleDorksTool,
     "ai_analysis":  AIAnalysisTool,
 }

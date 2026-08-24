@@ -40,6 +40,16 @@ def test_scope_fingerprint_changes_with_policy() -> None:
     assert first != second
 
 
+def test_scope_fingerprint_changes_with_email_verification_option() -> None:
+    discovery_only = scope_fingerprint(
+        ["example.com"], [], ["email_finder"], None, {"verify_emails": False}
+    )
+    verified = scope_fingerprint(
+        ["example.com"], [], ["email_finder"], None, {"verify_emails": True}
+    )
+    assert discovery_only != verified
+
+
 @pytest.mark.asyncio
 async def test_artifact_deletion_cannot_escape_workspace(tmp_path: Path) -> None:
     storage = SqlStorage(tmp_path)

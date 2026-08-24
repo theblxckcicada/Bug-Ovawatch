@@ -22,6 +22,7 @@ KEY_ENV_MAP: dict[str, str] = {
     "wpscan_api_token": "WPSCAN_API_TOKEN",
     # SerpApi Google Search (for live Google dorking results)
     "serpapi_api_key": "SERPAPI_API_KEY",
+    "hunter_api_key": "HUNTER_API_KEY",
     # AI providers
     "openai_api_key": "OPENAI_API_KEY",
     "anthropic_api_key": "ANTHROPIC_API_KEY",
