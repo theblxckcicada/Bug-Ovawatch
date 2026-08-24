@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from storage import SqlStorage
-from tool_secrets import apply_tool_api_keys
+from tool_secrets import apply_tool_api_keys, normalize_tool_api_keys
 from models import ScanStatus
 from observability import metrics_middleware, prometheus_metrics
 
@@ -37,7 +37,13 @@ async def lifespan(app: FastAPI):
     Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.database_dir).mkdir(parents=True, exist_ok=True)
 
-    apply_tool_api_keys(await storage.load_tool_api_keys())
+    stored_tool_keys = await storage.load_tool_api_keys()
+    normalized_tool_keys = normalize_tool_api_keys(stored_tool_keys)
+    if stored_tool_keys != normalized_tool_keys:
+        # Persist the current schema so removed provider credentials (such as
+        # legacy Google CSE fields) do not remain dormant in SQLite.
+        await storage.save_tool_api_keys(normalized_tool_keys)
+    apply_tool_api_keys(normalized_tool_keys)
 
     # Background tasks are process-local. Mark interrupted runs explicitly so a
     # restart never leaves an assessment permanently displayed as running.

@@ -57,17 +57,11 @@ import { SystemStatus, ToolApiKeysConfig } from '../../core/models';
             <span class="hint">Stored as <span class="mono">WPSCAN_API_TOKEN</span>. Without it wpscan still runs with built-in checks only.</span>
           </div>
 
-          <div class="two-col">
-            <div class="form-group">
-              <label class="form-label">Google Search (CSE) API Key</label>
-              <input class="form-input" type="password" [(ngModel)]="apiKeys.google_cse_api_key" placeholder="Enables live Google dorking results" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Google Search Engine ID (cx)</label>
-              <input class="form-input" [(ngModel)]="apiKeys.google_cse_cx" placeholder="Programmable Search Engine ID" />
-            </div>
+          <div class="form-group">
+            <label class="form-label">SerpApi API Key</label>
+            <input class="form-input" type="password" [(ngModel)]="apiKeys.serpapi_api_key" placeholder="Enables Google dorking through SerpApi" />
+            <span class="hint">Stored as <span class="mono">SERPAPI_API_KEY</span>. Without it, dorking falls back to DuckDuckGo.</span>
           </div>
-          <span class="hint">Without these, dorking falls back to DuckDuckGo for live results.</span>
         </div>
 
         <div class="card ai-card">
@@ -170,7 +164,7 @@ export class SettingsComponent implements OnInit {
   system = signal<SystemStatus | null>(null);
   apiKeys: ToolApiKeysConfig = {
     pdcp_api_key:'', github_token:'', shodan_api_key:'', censys_api_id:'', censys_api_secret:'', chaos_key:'',
-    wpscan_api_token:'', google_cse_api_key:'', google_cse_cx:'',
+    wpscan_api_token:'', serpapi_api_key:'',
     openai_api_key:'', anthropic_api_key:'', google_ai_api_key:'', deepseek_api_key:'', groq_api_key:''
   };
 

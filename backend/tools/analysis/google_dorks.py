@@ -1,9 +1,8 @@
 """Advanced Google dorking — generates dorks AND executes them to return results.
 
 Search backends, in priority order:
-  1. Google Programmable Search (CSE) JSON API — used when both
-     ``GOOGLE_CSE_API_KEY`` and ``GOOGLE_CSE_CX`` are configured in Settings.
-     This is the supported, ToS-friendly way to query Google programmatically.
+  1. SerpApi Google Search API — used when ``SERPAPI_API_KEY`` is configured in
+     Settings. SerpApi returns structured Google organic results.
   2. DuckDuckGo HTML endpoint — a no-API-key fallback that honours most dork
      operators (``site:``, ``filetype:``, ``intitle:``) and returns real result
      links so the dork tab is populated even without Google credentials.
@@ -90,36 +89,42 @@ class GoogleDorksTool(BaseTool):
 
     # ── Search backends ──────────────────────────────────────────────
     def _select_backend(self) -> str:
-        if os.environ.get("GOOGLE_CSE_API_KEY") and os.environ.get("GOOGLE_CSE_CX"):
-            return "google_cse"
+        if os.environ.get("SERPAPI_API_KEY"):
+            return "serpapi"
         return "duckduckgo"
 
     async def _search(self, session: aiohttp.ClientSession, backend: str, query: str) -> list[dict[str, str]]:
         try:
-            if backend == "google_cse":
-                return await self._search_google_cse(session, query)
+            if backend == "serpapi":
+                return await self._search_serpapi(session, query)
             return await self._search_duckduckgo(session, query)
         except Exception:
             return []
 
-    async def _search_google_cse(self, session: aiohttp.ClientSession, query: str) -> list[dict[str, str]]:
+    async def _search_serpapi(
+        self, session: aiohttp.ClientSession, query: str,
+    ) -> list[dict[str, str]]:
+        """Fetch structured Google organic results through SerpApi."""
         params = {
-            "key": os.environ["GOOGLE_CSE_API_KEY"],
-            "cx": os.environ["GOOGLE_CSE_CX"],
+            "engine": "google",
+            "api_key": os.environ["SERPAPI_API_KEY"],
             "q": query,
             "num": str(MAX_RESULTS_PER_DORK),
+            "hl": "en",
         }
-        async with session.get("https://www.googleapis.com/customsearch/v1", params=params) as resp:
+        async with session.get("https://serpapi.com/search.json", params=params) as resp:
             if resp.status >= 400:
                 return []
             data = await resp.json()
+        if data.get("error"):
+            return []
         hits = []
-        for item in (data.get("items") or [])[:MAX_RESULTS_PER_DORK]:
+        for item in (data.get("organic_results") or [])[:MAX_RESULTS_PER_DORK]:
             hits.append({
                 "title": item.get("title", ""),
                 "url": item.get("link", ""),
                 "snippet": item.get("snippet", ""),
-                "engine": "google_cse",
+                "engine": "serpapi_google",
             })
         return hits
 

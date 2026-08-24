@@ -20,9 +20,8 @@ KEY_ENV_MAP: dict[str, str] = {
     "chaos_key": "CHAOS_KEY",
     # WPScan WordPress Vulnerability Database API token
     "wpscan_api_token": "WPSCAN_API_TOKEN",
-    # Google Programmable Search (for live Google dorking results)
-    "google_cse_api_key": "GOOGLE_CSE_API_KEY",
-    "google_cse_cx": "GOOGLE_CSE_CX",
+    # SerpApi Google Search (for live Google dorking results)
+    "serpapi_api_key": "SERPAPI_API_KEY",
     # AI providers
     "openai_api_key": "OPENAI_API_KEY",
     "anthropic_api_key": "ANTHROPIC_API_KEY",

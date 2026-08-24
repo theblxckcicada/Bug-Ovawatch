@@ -180,7 +180,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 - **Resume vs. fresh:** reuse is permitted only from one completed assessment with the same scope, exclusions, selected tools, and wordlist fingerprint. Its evidence snapshot is copied into the new workspace before results are reused.
 - **URL validation** — every discovered URL (waybackurls, gau, katana, urlfinder) is re-probed with httpx and any that no longer respond (dead hosts, `404`/`410` gone pages) are removed before it reaches the results. Broken/blank screenshots are likewise discarded.
 - **WordPress scanning** — `wpscan` checks **every verified alive HTTP service**, even when technology fingerprinting does not identify WordPress. URLs are normalised to their `scheme://host:port` site root and de-duplicated, with no fixed target cap. WPScan's `--force` mode safely evaluates each service and surfaces any core/plugin/theme vulnerabilities, interesting findings, and enumerated users in a dedicated **WordPress** results tab. Add a **WPScan API token** in Settings to query the WordPress Vulnerability Database for CVE-level results.
-- **Google dorking** executes generated dorks live — via Google Programmable Search (CSE) when an API key + engine ID are saved in Settings, otherwise a DuckDuckGo fallback.
+- **Google dorking** executes generated dorks live through SerpApi's Google Search API when a SerpApi key is saved in Settings, otherwise it uses the no-key DuckDuckGo fallback.
 - **Subdomain takeover** hunts dangling/claimable subdomains (nuclei takeover templates, plus `subzy` when available).
 - **CVE checks** run Nuclei's CVE-tagged templates only against URLs already
   verified as alive. General Nuclei scanning excludes that tag to prevent the

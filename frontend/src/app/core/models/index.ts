@@ -181,8 +181,7 @@ export interface ToolApiKeysConfig {
   censys_api_secret: string;
   chaos_key: string;
   wpscan_api_token: string;
-  google_cse_api_key: string;
-  google_cse_cx: string;
+  serpapi_api_key: string;
   openai_api_key: string;
   anthropic_api_key: string;
   google_ai_api_key: string;
