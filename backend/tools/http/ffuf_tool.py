@@ -35,12 +35,13 @@ class FfufTool(BaseTool):
                 continue
             base = f"{parsed.scheme}://{parsed.netloc}"
             output = out_dir / f"ffuf_{index}.json"
-            result = await self._exec([
+            command = [
                 "ffuf", "-u", f"{base}/FUZZ", "-w", str(content_wordlist),
                 "-of", "json", "-o", str(output), "-ac", "-mc", "all",
                 "-fc", "404", "-rate", "25", "-t", "10", "-timeout", "8",
                 "-maxtime", "120", "-noninteractive", "-s",
-            ], timeout=150)
+            ] + self._header_args()
+            result = await self._exec(command, timeout=150)
             if output.is_file():
                 try:
                     payload = json.loads(output.read_text(encoding="utf-8"))

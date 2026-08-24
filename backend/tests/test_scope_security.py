@@ -50,6 +50,18 @@ def test_scope_fingerprint_changes_with_email_verification_option() -> None:
     assert discovery_only != verified
 
 
+def test_scope_fingerprint_changes_with_request_identity() -> None:
+    baseline = scope_fingerprint(
+        ["example.com"], [], ["httpx"], None,
+        {"user_agent": "ShadowGrid/3.1", "custom_headers": {}},
+    )
+    authenticated = scope_fingerprint(
+        ["example.com"], [], ["httpx"], None,
+        {"user_agent": "ShadowGrid/3.1", "custom_headers": {"Authorization": "Bearer test"}},
+    )
+    assert baseline != authenticated
+
+
 @pytest.mark.asyncio
 async def test_artifact_deletion_cannot_escape_workspace(tmp_path: Path) -> None:
     storage = SqlStorage(tmp_path)

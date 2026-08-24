@@ -11,6 +11,7 @@ from control_models import (
     ScanSchedule, SuppressionRule, utc_now,
 )
 from tools.registry import REGISTRY
+from request_config import DEFAULT_USER_AGENT
 
 router = APIRouter(prefix="/control", tags=["control"])
 
@@ -34,11 +35,18 @@ class ScheduleCreate(BaseModel):
     interval_minutes: int = Field(default=10080, ge=15, le=525600)
     tools: list[str] = Field(min_length=1, max_length=40)
     verify_emails: bool = False
+    user_agent: str = DEFAULT_USER_AGENT
+    custom_headers: dict[str, str] = Field(default_factory=dict)
 
 
 @router.get("/schedules")
 async def list_schedules(project_id: str | None = None):
-    return await _storage().list_control_records("schedule", project_id)
+    records = await _storage().list_control_records("schedule", project_id)
+    for record in records:
+        record["custom_headers"] = {
+            name: "********" for name in (record.get("custom_headers") or {})
+        }
+    return records
 
 
 @router.post("/schedules", status_code=201)
@@ -54,7 +62,9 @@ async def create_schedule(body: ScheduleCreate):
     )
     await storage.save_control_record("schedule", schedule.id, schedule.model_dump(mode="json"), body.project_id)
     await _audit("schedule_created", "schedule", schedule.id, body.project_id)
-    return schedule
+    payload = schedule.model_dump(mode="json")
+    payload["custom_headers"] = {name: "********" for name in schedule.custom_headers}
+    return payload
 
 
 @router.delete("/schedules/{schedule_id}", status_code=204)

@@ -9,7 +9,10 @@ from scan_engine import _write_execution_manifest
 
 
 def test_manifest_hashes_artifacts_and_summarizes_tools(tmp_path) -> None:
-    scan = Scan(project_id=str(uuid.uuid4()), tools=["dnsx"])
+    scan = Scan(
+        project_id=str(uuid.uuid4()), tools=["dnsx"],
+        custom_headers={"Authorization": "Bearer manifest-secret"},
+    )
     scan.scope_hash = "scope-hash"
     artifact = tmp_path / "example.com" / "dnsx.txt"
     artifact.parent.mkdir()
@@ -29,3 +32,5 @@ def test_manifest_hashes_artifacts_and_summarizes_tools(tmp_path) -> None:
     assert manifest["tool_results"][0]["count"] == 1
     assert manifest["artifacts"][0]["path"] == "example.com/dnsx.txt"
     assert len(manifest["artifacts"][0]["sha256"]) == 64
+    assert manifest["custom_header_names"] == ["Authorization"]
+    assert "manifest-secret" not in manifest_path.read_text()

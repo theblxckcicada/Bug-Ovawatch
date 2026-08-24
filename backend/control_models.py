@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field, HttpUrl
+from pydantic import field_validator
+from request_config import DEFAULT_USER_AGENT, validate_custom_headers, validate_user_agent
 
 
 def utc_now() -> datetime:
@@ -28,10 +30,15 @@ class ScanSchedule(BaseModel):
     interval_minutes: int = Field(default=10080, ge=15, le=525600)
     tools: list[str] = Field(min_length=1, max_length=40)
     verify_emails: bool = False
+    user_agent: str = DEFAULT_USER_AGENT
+    custom_headers: dict[str, str] = Field(default_factory=dict)
     enabled: bool = True
     next_run_at: datetime = Field(default_factory=utc_now)
     last_run_at: datetime | None = None
     created_at: datetime = Field(default_factory=utc_now)
+
+    _validate_user_agent = field_validator("user_agent")(validate_user_agent)
+    _validate_custom_headers = field_validator("custom_headers")(validate_custom_headers)
 
 
 class FindingState(BaseModel):

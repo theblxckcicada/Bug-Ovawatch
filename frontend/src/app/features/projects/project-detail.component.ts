@@ -25,6 +25,8 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'AI':                    ['ai_analysis'],
 };
 
+interface CustomHeaderEntry { name: string; value: string; }
+
 @Component({
   selector: 'sg-project-detail',
   standalone: true,
@@ -203,6 +205,20 @@ const TOOL_GROUPS: Record<string, string[]> = {
                 <div class="schedule-row"><span>Every {{schedule.interval_minutes}} minutes · next {{schedule.next_run_at | date:'short'}}</span><button class="btn btn-ghost btn-sm" (click)="deleteSchedule(schedule.id)">Remove</button></div>
               }
             </div>
+
+            <div class="request-config">
+              <div class="form-group">
+                <label class="form-label">User-Agent</label>
+                <input class="form-input mono" [(ngModel)]="userAgent" maxlength="512" placeholder="ShadowGrid/3.1" />
+                <span class="request-hint">Applied to target-facing HTTP tools. Provider APIs keep ShadowGrid's integration User-Agent.</span>
+              </div>
+              <div class="section-head"><span class="form-label">Custom request headers</span><button class="btn btn-ghost btn-sm" (click)="addHeader()" [disabled]="customHeaders.length >= 20">+ Add header</button></div>
+              @for (header of customHeaders; track $index) {
+                <div class="header-row"><input class="form-input mono" [(ngModel)]="header.name" placeholder="Header-Name" /><input class="form-input mono" [(ngModel)]="header.value" placeholder="Value" type="password" /><button class="btn btn-ghost btn-sm" (click)="removeHeader($index)">Remove</button></div>
+              }
+              @if (headerError()) { <div class="alert alert-danger">{{headerError()}}</div> }
+              <span class="request-hint">Header values are masked in this form and redacted from tool logs and execution manifests. Host, Content-Length, User-Agent, and hop-by-hop headers are blocked.</span>
+            </div>
           </div>
 
           <!-- Resume vs. new scan prompt -->
@@ -334,6 +350,10 @@ const TOOL_GROUPS: Record<string, string[]> = {
     .schedule-panel small { color:var(--text-dim);font-size:10px; }
     .schedule-panel select { width:120px; }
     .schedule-row { flex-basis:100%;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-dim); }
+    .request-config { margin:16px 0;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-elevated); }
+    .header-row { display:grid;grid-template-columns:minmax(140px,.7fr) minmax(180px,1.3fr) auto;gap:8px;margin:8px 0; }
+    .request-hint { display:block;font-size:10px;line-height:1.5;color:var(--text-dim);margin-top:5px; }
+    @media(max-width:650px){.header-row{grid-template-columns:1fr}.header-row button{justify-self:start}}
     input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
     .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:200; }
     .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; max-width:460px; width:90%; }
@@ -364,6 +384,9 @@ export class ProjectDetailComponent implements OnInit {
   customWordlist = '';
   verifyEmails = false;
   scheduleInterval = 10080;
+  userAgent = 'ShadowGrid/3.1';
+  customHeaders: CustomHeaderEntry[] = [];
+  headerError = signal('');
   selectedTools = new Set<string>(DEFAULT_TOOLS);
 
   inscope = computed(() => this.targets().filter((t: any) => !t.is_oos));
@@ -448,6 +471,8 @@ export class ProjectDetailComponent implements OnInit {
 
   private startScan(reusePrevious: boolean) {
     if (this.inscope().length === 0) return;
+    const headers = this.requestHeaders();
+    if (this.headerError()) return;
     this.launching.set(true);
     this.api.startScan(
       this.project()!.id,
@@ -455,6 +480,8 @@ export class ProjectDetailComponent implements OnInit {
       this.customWordlist || undefined,
       reusePrevious,
       this.selectedTools.has('email_finder') && this.verifyEmails,
+      this.userAgent.trim() || 'ShadowGrid/3.1',
+      headers,
     )
       .subscribe({
         next: scan => this.router.navigate(['/scan', scan.id, 'progress']),
@@ -465,10 +492,27 @@ export class ProjectDetailComponent implements OnInit {
   createSchedule() {
     const project = this.project();
     if (!project || this.selectedTools.size === 0) return;
+    const headers = this.requestHeaders();
+    if (this.headerError()) return;
     this.api.createSchedule(
       project.id, [...this.selectedTools], this.scheduleInterval,
       this.selectedTools.has('email_finder') && this.verifyEmails,
+      this.userAgent.trim() || 'ShadowGrid/3.1', headers,
     ).subscribe(schedule => this.schedules.update(rows => [...rows, schedule]));
+  }
+
+  addHeader() { if (this.customHeaders.length < 20) this.customHeaders.push({name:'', value:''}); }
+  removeHeader(index: number) { this.customHeaders.splice(index, 1); this.headerError.set(''); }
+  private requestHeaders(): Record<string,string> {
+    const headers: Record<string,string> = {};
+    this.headerError.set('');
+    for (const header of this.customHeaders) {
+      const name = header.name.trim(); const value = header.value.trim();
+      if (!name && !value) continue;
+      if (!name || !value) { this.headerError.set('Every custom header needs a name and value.'); continue; }
+      headers[name] = value;
+    }
+    return headers;
   }
 
   deleteSchedule(id: string) {

@@ -33,6 +33,7 @@ async def launch_scheduled_scan(schedule: ScanSchedule, storage, settings) -> Sc
     scan = Scan(
         project_id=schedule.project_id, tools=schedule.tools,
         verify_emails=schedule.verify_emails and "email_finder" in schedule.tools,
+        user_agent=schedule.user_agent, custom_headers=schedule.custom_headers,
     )
     await storage.save_scan(scan)
     project.scan_count += 1

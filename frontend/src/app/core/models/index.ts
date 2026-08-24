@@ -30,6 +30,8 @@ export interface Scan {
   workspace: string;
   artifacts_deleted_at: string | null;
   verify_emails: boolean;
+  user_agent: string;
+  custom_headers: Record<string, string>;
 }
 
 export interface ToolInfo {
@@ -146,6 +148,8 @@ export interface ScanSchedule {
   interval_minutes: number;
   tools: string[];
   verify_emails: boolean;
+  user_agent: string;
+  custom_headers: Record<string, string>;
   enabled: boolean;
   next_run_at: string;
   last_run_at?: string;

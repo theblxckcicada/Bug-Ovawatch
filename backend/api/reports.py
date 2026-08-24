@@ -58,7 +58,14 @@ async def export_report(scan_id: str, format: str = Query("html", pattern="^(htm
     assets = [asset.model_dump(mode="json") for asset in snapshot.assets]
     if format == "json":
         return Response(
-            json.dumps({"project": name, "scan": scan.model_dump(mode="json"), "inventory": snapshot.model_dump(mode="json")}, indent=2),
+            json.dumps({
+                "project": name,
+                "scan": {
+                    **scan.model_dump(mode="json"),
+                    "custom_headers": {key: "********" for key in scan.custom_headers},
+                },
+                "inventory": snapshot.model_dump(mode="json"),
+            }, indent=2),
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="shadowgrid-{scan_id}.json"'},
         )

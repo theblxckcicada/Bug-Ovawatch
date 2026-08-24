@@ -84,7 +84,10 @@ class OriginExposureTool(BaseTool):
                     return
 
         connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        async with aiohttp.ClientSession(
+            timeout=timeout, connector=connector,
+            headers=dict(extra.get("request_headers") or {}),
+        ) as session:
             await asyncio.gather(*(inspect(url, ip, session) for url, ip in candidates[:150]))
         serialized = json.dumps(findings)
         (out_dir / "origin_exposure.json").write_text(serialized, encoding="utf-8")

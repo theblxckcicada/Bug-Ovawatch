@@ -26,9 +26,10 @@ class Wafw00fTool(BaseTool):
         errors: list[str] = []
         for index, url in enumerate(urls[:100]):
             output = out_dir / f"wafw00f_{index}.json"
-            result = await self._exec([
+            command = [
                 "wafw00f", url, "-f", "json", "-o", str(output), "-a",
-            ], timeout=45)
+            ] + self._header_args()
+            result = await self._exec(command, timeout=45)
             if output.is_file():
                 try:
                     value = json.loads(output.read_text(encoding="utf-8"))

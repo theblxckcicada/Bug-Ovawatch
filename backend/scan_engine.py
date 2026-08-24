@@ -29,6 +29,7 @@ from tool_secrets import apply_tool_api_keys
 from scope import scan_workspace, scope_fingerprint
 from config import settings
 from inventory import build_inventory
+from request_config import target_request_headers
 
 logger = logging.getLogger(__name__)
 
@@ -298,6 +299,8 @@ def _write_execution_manifest(scan: Scan, workspace: Path, domains: list[str],
         "selected_tools": scan.tools,
         "wordlist": scan.wordlist,
         "verify_emails": scan.verify_emails,
+        "user_agent": scan.user_agent,
+        "custom_header_names": sorted(scan.custom_headers),
         "started_at": scan.started_at.isoformat() if scan.started_at else None,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "tool_results": [
@@ -486,7 +489,10 @@ async def _run_tool(
     try:
         result = await tool.execute(
             domain, scan.id, scan.project_id, oos, wordlist,
-            extra={"verify_emails": scan.verify_emails},
+            extra={
+                "verify_emails": scan.verify_emails,
+                "request_headers": target_request_headers(scan.user_agent, scan.custom_headers),
+            },
         )
         from evidence import persist_result_evidence
         await persist_result_evidence(result, output_dir, storage)
@@ -626,7 +632,11 @@ async def run_scan(
     scan.workspace = str(workspace_root.relative_to(output_dir.resolve())).replace("\\", "/")
     scan.scope_hash = scope_fingerprint(
         domains, oos, scan.tools, scan.wordlist,
-        {"verify_emails": scan.verify_emails},
+        {
+            "verify_emails": scan.verify_emails,
+            "user_agent": scan.user_agent,
+            "custom_headers": scan.custom_headers,
+        },
     )
 
     if reuse_previous:

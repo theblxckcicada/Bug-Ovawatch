@@ -17,10 +17,11 @@ class WhatWebTool(BaseTool):
         if not urls_file.exists():
             return RunResult("", "No alive_urls.txt", 1, 0)
         outfile = out_dir / "whatweb.jsonl"
-        return await self._exec([
+        command = [
             "whatweb", "--input-file", str(urls_file),
             "--log-json", str(outfile), "--quiet", "--no-errors",
-        ], timeout=600)
+        ] + self._header_args("--header")
+        return await self._exec(command, timeout=600)
 
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:
         rows = []

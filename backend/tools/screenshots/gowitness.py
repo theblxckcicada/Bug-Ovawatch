@@ -43,6 +43,12 @@ class GowitnessTool(BaseTool):
             "--screenshot-path", str(ss_dir),
             "--timeout", "30",
         ]
+        request_headers = dict(extra.get("request_headers") or {})
+        base_cmd.extend([
+            "--chrome-user-agent", request_headers.pop("User-Agent", "ShadowGrid/3.1"),
+        ])
+        for name, value in request_headers.items():
+            base_cmd.extend(["--chrome-header", f"{name}: {value}"])
         if chrome:
             base_cmd.extend(["--chrome-path", chrome])
 

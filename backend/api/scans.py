@@ -14,6 +14,15 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 TERMINAL_SCAN_STATUSES = {"completed", "failed", "cancelled"}
 
 
+def _public_scan(scan: Scan) -> dict:
+    """Serialize an assessment without returning sensitive header values."""
+    payload = scan.model_dump(mode="json")
+    payload["custom_headers"] = {
+        name: "********" for name in scan.custom_headers
+    }
+    return payload
+
+
 def _get_storage():
     from main import storage
     return storage
@@ -65,6 +74,8 @@ async def create_scan(body: ScanCreate, background_tasks: BackgroundTasks):
         tools=selected_tools,
         wordlist=wordlist,
         verify_emails=body.verify_emails and "email_finder" in selected_tools,
+        user_agent=body.user_agent,
+        custom_headers=body.custom_headers,
     )
     await storage.save_scan(scan)
 
@@ -85,12 +96,12 @@ async def create_scan(body: ScanCreate, background_tasks: BackgroundTasks):
         reuse_previous=body.reuse_previous,
     )
 
-    return scan
+    return _public_scan(scan)
 
 
 @router.get("/{project_id}/list")
 async def list_scans(project_id: str):
-    return await _get_storage().list_scans(project_id)
+    return [_public_scan(scan) for scan in await _get_storage().list_scans(project_id)]
 
 
 @router.get("/{scan_id}")
@@ -98,7 +109,7 @@ async def get_scan(scan_id: str):
     scan = await _get_storage().get_scan(scan_id)
     if not scan:
         raise HTTPException(404, "Scan not found")
-    return scan
+    return _public_scan(scan)
 
 
 async def _cancel(scan_id: str) -> dict:
@@ -151,6 +162,7 @@ async def retry_failed_tools(scan_id: str, background_tasks: BackgroundTasks):
         ScanCreate(
             project_id=scan.project_id, tools=failed_tools,
             wordlist=scan.wordlist, verify_emails=scan.verify_emails,
+            user_agent=scan.user_agent, custom_headers=scan.custom_headers,
         ),
         background_tasks,
     )

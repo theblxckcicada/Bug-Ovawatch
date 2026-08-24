@@ -69,7 +69,10 @@ class WebPostureTool(BaseTool):
                     return
 
         connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        async with aiohttp.ClientSession(
+            timeout=timeout, connector=connector,
+            headers=dict(extra.get("request_headers") or {}),
+        ) as session:
             await asyncio.gather(*(inspect(url, session) for url in urls))
         serialized = json.dumps(findings)
         (out_dir / "web_posture.json").write_text(serialized, encoding="utf-8")

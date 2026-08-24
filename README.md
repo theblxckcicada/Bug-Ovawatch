@@ -37,6 +37,9 @@ It's built for **security teams, penetration testers, and bug-bounty hunters** w
 - **Resumable & cancellable** — stop a run mid-flight (in-flight processes are terminated **and the cancelled assessment's data is deleted**), or resume a program and reuse prior successful results instead of re-running finished work.
 - **Editable & tidy** — rename a program or edit its description after creation, and **clear all of a program's assessment history** (including cancelled runs) in one click.
 - **Scope-aware** — out-of-scope patterns (incl. wildcards) are filtered at every stage, so results stay inside your authorisation.
+- **Assessment request identity** — every assessment uses `ShadowGrid/3.1` by
+  default and can define a custom User-Agent plus validated headers for
+  authenticated target testing. Header values are redacted from logs and manifests.
 - **SQL-first persistence** — mandatory local SQLite storage with transactions,
   foreign keys, WAL concurrency, and automatic migration from legacy JSON metadata.
 - **Continuous monitoring** — durable daily, weekly, or monthly schedules,

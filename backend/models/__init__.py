@@ -10,6 +10,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from scope import normalize_domain
+from request_config import DEFAULT_USER_AGENT, validate_custom_headers, validate_user_agent
 
 
 def now_utc() -> datetime:
@@ -184,6 +185,11 @@ class ScanCreate(BaseModel):
     reuse_previous: bool = False
     # Hunter Email Verifier consumes separate credits, so it is always opt-in.
     verify_emails: bool = False
+    user_agent: str = DEFAULT_USER_AGENT
+    custom_headers: dict[str, str] = Field(default_factory=dict)
+
+    _validate_user_agent = field_validator("user_agent")(validate_user_agent)
+    _validate_custom_headers = field_validator("custom_headers")(validate_custom_headers)
 
 
 class ScanProgress(BaseModel):
@@ -218,6 +224,11 @@ class Scan(BaseModel):
     workspace: str = ""
     artifacts_deleted_at: Optional[datetime] = None
     verify_emails: bool = False
+    user_agent: str = DEFAULT_USER_AGENT
+    custom_headers: dict[str, str] = Field(default_factory=dict)
+
+    _validate_user_agent = field_validator("user_agent")(validate_user_agent)
+    _validate_custom_headers = field_validator("custom_headers")(validate_custom_headers)
 
     def to_table_entity(self) -> dict:
         import json
@@ -235,6 +246,8 @@ class Scan(BaseModel):
             "workspace": self.workspace,
             "artifacts_deleted_at": self.artifacts_deleted_at.isoformat() if self.artifacts_deleted_at else "",
             "verify_emails": self.verify_emails,
+            "user_agent": self.user_agent,
+            "custom_headers": json.dumps(self.custom_headers),
         }
 
     @staticmethod
@@ -257,6 +270,8 @@ class Scan(BaseModel):
                 if e.get("artifacts_deleted_at") else None
             ),
             verify_emails=bool(e.get("verify_emails", False)),
+            user_agent=e.get("user_agent") or DEFAULT_USER_AGENT,
+            custom_headers=json.loads(e.get("custom_headers", "{}")),
         )
 
 

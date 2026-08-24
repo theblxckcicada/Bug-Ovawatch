@@ -23,21 +23,23 @@ class NucleiTool(BaseTool):
             return RunResult("", "alive_urls.txt is empty — skipping nuclei", 0, 0)
 
         outfile = out_dir / "nuclei_results.jsonl"
-        result = await self._exec([
+        command = [
             "nuclei", "-list", str(alive_file),
             "-exclude-tags", "cve",
             "-severity", "low,medium,high,critical",
             "-jsonl", "-o", str(outfile), "-silent",
-        ], timeout=3600)
+        ] + self._header_args()
+        result = await self._exec(command, timeout=3600)
 
         # Older nuclei used -json instead of -jsonl.
         if result.returncode != 0 and "unknown flag" in (result.stderr or "").lower():
-            result = await self._exec([
+            command = [
                 "nuclei", "-list", str(alive_file),
                 "-exclude-tags", "cve",
                 "-severity", "low,medium,high,critical",
                 "-json", "-o", str(outfile), "-silent",
-            ], timeout=3600)
+            ] + self._header_args()
+            result = await self._exec(command, timeout=3600)
         return result
 
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:

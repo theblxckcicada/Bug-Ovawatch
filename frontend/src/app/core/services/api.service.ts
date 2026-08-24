@@ -45,9 +45,10 @@ export class ApiService {
   }
 
   // ── Scans ─────────────────────────────────────────────────────
-  startScan(projectId: string, tools: string[], wordlist?: string, reusePrevious = false, verifyEmails = false): Observable<Scan> {
+  startScan(projectId: string, tools: string[], wordlist?: string, reusePrevious = false, verifyEmails = false, userAgent = 'ShadowGrid/3.1', customHeaders: Record<string,string> = {}): Observable<Scan> {
     return this.http.post<Scan>(`${this.base}/scans/`, {
       project_id: projectId, tools, wordlist, reuse_previous: reusePrevious, verify_emails: verifyEmails,
+      user_agent: userAgent, custom_headers: customHeaders,
     });
   }
   getScans(projectId: string): Observable<Scan[]> {
@@ -140,9 +141,10 @@ export class ApiService {
     return this.http.get<ScanSchedule[]>(`${this.base}/control/schedules?project_id=${encodeURIComponent(projectId)}`);
   }
 
-  createSchedule(projectId: string, tools: string[], intervalMinutes: number, verifyEmails = false): Observable<ScanSchedule> {
+  createSchedule(projectId: string, tools: string[], intervalMinutes: number, verifyEmails = false, userAgent = 'ShadowGrid/3.1', customHeaders: Record<string,string> = {}): Observable<ScanSchedule> {
     return this.http.post<ScanSchedule>(`${this.base}/control/schedules`, {
       project_id: projectId, tools, interval_minutes: intervalMinutes, verify_emails: verifyEmails,
+      user_agent: userAgent, custom_headers: customHeaders,
     });
   }
 

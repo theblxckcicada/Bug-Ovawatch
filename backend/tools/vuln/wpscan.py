@@ -92,10 +92,17 @@ class WpscanTool(BaseTool):
             cmd = [
                 "wpscan", "--url", url,
                 "--format", "json", "--output", str(out_json),
-                "--no-banner", "--random-user-agent", "--disable-tls-checks",
+                "--no-banner", "--disable-tls-checks",
                 "--force", "--plugins-detection", "passive",
                 "--enumerate", "vp,vt,dbe,u",
             ]
+            request_headers = dict(extra.get("request_headers") or {})
+            user_agent = request_headers.pop("User-Agent", "ShadowGrid/3.1")
+            cmd += ["--user-agent", user_agent]
+            if request_headers:
+                cmd += ["--headers", "; ".join(
+                    f"{name}: {value}" for name, value in request_headers.items()
+                )]
             if api_token:
                 cmd += ["--api-token", api_token]
 

@@ -102,6 +102,7 @@ class BaseTool(ABC):
         # Expose the scan id to the subprocess helpers so spawned tool processes
         # can be registered for cancellation.
         self._scan_id = scan_id
+        self._request_headers = dict((extra or {}).get("request_headers") or {})
 
         domain_out = self.output_dir / domain
         domain_out.mkdir(parents=True, exist_ok=True)
@@ -121,6 +122,7 @@ class BaseTool(ABC):
         error = ""
         if run.returncode != 0:
             error = clean_tool_output(run.stderr or f"{self.name} exited with code {run.returncode}")[:2000]
+            error = self._redact_sensitive_text(error)
             # A non-zero exit (e.g. a timeout) frequently still leaves usable partial
             # output on disk — amass and the URL tools write incrementally. If parse()
             # recovered rows, treat the run as a partial success so downstream phases
@@ -155,12 +157,45 @@ class BaseTool(ABC):
 
     # ── Helpers available to all tools ───────────────────────────
     async def _exec(self, cmd: list[str], timeout: int = 600) -> RunResult:
-        logger.info(f"[{self.name}] {' '.join(str(c) for c in cmd)}")
+        logger.info("[%s] %s", self.name, " ".join(self._redacted_cmd(cmd)))
         return await self._run_proc(cmd, None, timeout)
 
     async def _exec_stdin(self, cmd: list[str], stdin_text: str, timeout: int = 600) -> RunResult:
-        logger.info(f"[{self.name}] (stdin) {' '.join(str(c) for c in cmd)}")
+        logger.info("[%s] (stdin) %s", self.name, " ".join(self._redacted_cmd(cmd)))
         return await self._run_proc(cmd, stdin_text, timeout)
+
+    @staticmethod
+    def _redacted_cmd(cmd: list[str]) -> list[str]:
+        """Hide assessment header values and credentials from subprocess logs."""
+        redacted: list[str] = []
+        hide_next = False
+        sensitive_flags = {
+            "-H", "--header", "--headers", "--chrome-header",
+            "--api-token", "-token",
+        }
+        for item in (str(part) for part in cmd):
+            if hide_next:
+                redacted.append("<redacted>")
+                hide_next = False
+            else:
+                redacted.append(item)
+                hide_next = item in sensitive_flags
+        return redacted
+
+    def _header_args(self, flag: str = "-H") -> list[str]:
+        """Return repeated CLI header arguments for the current assessment."""
+        args: list[str] = []
+        for name, value in getattr(self, "_request_headers", {}).items():
+            args.extend([flag, f"{name}: {value}"])
+        return args
+
+    def _redact_sensitive_text(self, value: str) -> str:
+        """Remove configured header values from persisted tool error messages."""
+        redacted = value
+        for header_value in getattr(self, "_request_headers", {}).values():
+            if header_value:
+                redacted = redacted.replace(header_value, "<redacted>")
+        return redacted
 
     async def _run_proc(self, cmd: list[str], stdin_text: str | None, timeout: int) -> RunResult:
         """Shared subprocess runner with cancellation registration and partial-output
@@ -242,11 +277,12 @@ class BaseTool(ABC):
         probe_in.write_text("\n".join(unique) + "\n")
 
         try:
-            result = await self._exec([
+            command = [
                 prober, "-silent", "-json", "-no-color",
                 "-list", str(probe_in),
                 "-timeout", "8", "-retries", "0", "-threads", "60",
-            ], timeout=timeout)
+            ] + self._header_args()
+            result = await self._exec(command, timeout=timeout)
         except Exception:
             logger.exception("[%s] URL validation prober failed — keeping unvalidated URLs", self.name)
             return unique

@@ -30,11 +30,12 @@ class HttpxTool(BaseTool):
             return RunResult("", "probe_candidates.txt is empty", 0, 0)
 
         outfile = out_dir / "httpx.jsonl"
-        return await self._exec([
+        command = [
             "pd-httpx", "-silent", "-list", str(alive_file),
             "-title", "-status-code", "-follow-redirects",
             "-tech-detect", "-json", "-o", str(outfile),
-        ], timeout=900)
+        ] + self._header_args()
+        return await self._exec(command, timeout=900)
 
     def parse(self, result: RunResult, domain: str) -> list[dict[str, Any]]:
         rows = []

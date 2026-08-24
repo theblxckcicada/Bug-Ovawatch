@@ -32,7 +32,7 @@ class CveCheckTool(BaseTool):
         command = [
             "nuclei", "-list", str(alive_file), "-tags", "cve",
             "-severity", "low,medium,high,critical", "-jsonl", "-o", str(output), "-silent",
-        ]
+        ] + self._header_args()
         result = await self._exec(command, timeout=3600)
         if result.returncode != 0 and "unknown flag" in (result.stderr or "").lower():
             command[command.index("-jsonl")] = "-json"
