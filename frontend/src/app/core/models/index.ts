@@ -133,6 +133,22 @@ export interface PortfolioFinding extends InventoryFinding {
   project_name: string;
   scan_id: string;
   asset_value: string;
+  disposition: 'new'|'confirmed'|'false_positive'|'accepted_risk'|'remediated'|'reopened';
+  assignee: string;
+  tags: string[];
+  notes: string;
+  suppressed: boolean;
+}
+
+export interface ScanSchedule {
+  id: string;
+  project_id: string;
+  interval_minutes: number;
+  tools: string[];
+  verify_emails: boolean;
+  enabled: boolean;
+  next_run_at: string;
+  last_run_at?: string;
 }
 
 export interface PortfolioResponse {

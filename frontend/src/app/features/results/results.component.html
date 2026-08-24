@@ -15,6 +15,9 @@
           <a class="btn btn-outline btn-sm" [routerLink]="['/scan', scanId, 'progress']">Live progress</a>
         }
         <button class="btn btn-outline btn-sm" (click)="exportJson()">↓ Export JSON</button>
+        <a class="btn btn-outline btn-sm" [href]="api.reportUrl(scanId, 'html')" target="_blank">Report / PDF</a>
+        <a class="btn btn-outline btn-sm" [href]="api.reportUrl(scanId, 'sarif')">SARIF</a>
+        <a class="btn btn-outline btn-sm" [href]="api.graphUrl(scanId)" target="_blank">Graph data</a>
         <button class="btn btn-danger btn-sm" [disabled]="isLive() || deletingArtifacts() || !!artifactsDeletedAt()" (click)="deleteRawOutputs()">
           {{artifactsDeletedAt() ? 'Raw outputs deleted' : (deletingArtifacts() ? 'Deleting…' : 'Delete raw outputs')}}
         </button>

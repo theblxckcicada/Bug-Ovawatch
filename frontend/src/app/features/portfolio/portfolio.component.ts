@@ -67,7 +67,12 @@ type PortfolioMode = 'assets' | 'findings' | 'changes';
             @for (finding of filteredFindings(); track finding.project_id + finding.id) {
               <article class="finding-card" [class]="finding.severity">
                 <div class="finding-main"><span class="badge badge-{{finding.severity}}">{{finding.severity}}</span><div><h3>{{finding.title}}</h3><div class="source-line">{{finding.asset_value}} · {{finding.tool}}</div></div></div>
-                <div class="finding-actions"><a [routerLink]="['/projects', finding.project_id]">{{finding.project_name}}</a><a class="btn btn-outline btn-sm" [routerLink]="['/scan', finding.scan_id, 'results']">Evidence</a></div>
+                <div class="finding-actions">
+                  <select class="filter-select" [ngModel]="finding.disposition" (ngModelChange)="triage(finding, $event)" aria-label="Finding disposition">
+                    <option value="new">New</option><option value="confirmed">Confirmed</option><option value="false_positive">False positive</option><option value="accepted_risk">Accepted risk</option><option value="remediated">Remediated</option><option value="reopened">Reopened</option>
+                  </select>
+                  <a [routerLink]="['/projects', finding.project_id]">{{finding.project_name}}</a><a class="btn btn-outline btn-sm" [routerLink]="['/scan', finding.scan_id, 'results']">Evidence</a>
+                </div>
               </article>
             } @empty { <div class="card"><div class="empty-state"><h3>No findings match</h3><p>No unresolved findings meet the selected filters.</p></div></div> }
           </div>
@@ -129,5 +134,8 @@ export class PortfolioComponent implements OnInit {
 
   ngOnInit(): void { this.mode.set((this.route.snapshot.data['mode'] || 'assets') as PortfolioMode); this.projectId.set(this.route.snapshot.queryParamMap.get('project') || ''); this.load(); }
   load(): void { this.loading.set(true); this.error.set(''); this.api.getPortfolio().subscribe({next:data=>{this.data.set(data);this.loading.set(false)},error:error=>{this.error.set(error?.error?.detail||'Could not load portfolio data.');this.loading.set(false)}}); }
+  triage(finding: PortfolioFinding, disposition: string): void {
+    this.api.updateFindingState(finding.id, finding.project_id, disposition).subscribe(() => this.load());
+  }
   private rank(finding: PortfolioFinding): number { return ({critical:0,high:1,medium:2,low:3,info:4} as Record<string,number>)[finding.severity] ?? 5; }
 }

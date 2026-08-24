@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -70,7 +71,16 @@ async def lifespan(app: FastAPI):
         logger.info("Persisted %d legacy screenshot(s) in SQLite", backfilled)
 
     logger.info("ShadowGrid backend started")
-    yield
+    from scheduler import scheduler_loop
+    scheduler_task = asyncio.create_task(scheduler_loop(storage, settings))
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
     logger.info("ShadowGrid backend stopped")
 
 
@@ -106,6 +116,8 @@ from api.settings import router as settings_router
 from api.tools import router as tools_router
 from api.inventory import router as inventory_router
 from api.portfolio import router as portfolio_router
+from api.control import router as control_router
+from api.reports import router as reports_router
 
 # Auth endpoints are public (status/setup/login). Everything else requires a token.
 app.include_router(auth_router, prefix="/api")
@@ -118,6 +130,8 @@ for router in [
     tools_router,
     inventory_router,
     portfolio_router,
+    control_router,
+    reports_router,
 ]:
     app.include_router(router, prefix="/api", dependencies=[Depends(require_auth)])
 

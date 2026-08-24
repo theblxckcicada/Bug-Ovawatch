@@ -56,7 +56,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   severities = ['all','critical','high','medium','low','info'];
   COMMON_PORTS = new Set([80,443,8080,8443,22,21,25,3389,3306,5432,6379,27017]);
 
-  constructor(private route: ActivatedRoute, private api: ApiService) {}
+  constructor(private route: ActivatedRoute, public api: ApiService) {}
 
   ngOnInit() {
     this.scanId = this.route.snapshot.paramMap.get('scanId')!;

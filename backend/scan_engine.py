@@ -717,6 +717,8 @@ async def run_scan(
                 results=normalized_results,
             )
             await storage.save_inventory(snapshot)
+            from finding_workflow import reopen_reappearing_findings
+            await reopen_reappearing_findings(snapshot, storage)
             await asyncio.to_thread(
                 _write_execution_manifest,
                 scan,
@@ -734,6 +736,9 @@ async def run_scan(
 
     scan.completed_at = datetime.now(timezone.utc)
     await storage.save_scan(scan)
+    if scan.status == ScanStatus.COMPLETED:
+        from notifications import notify_scan_completed
+        await notify_scan_completed(scan, storage)
     await _emit(
         scan, storage, "__scan__", scan.status.value, scan.status.value,
         overall_completed_tools=overall_completed_ref["value"],

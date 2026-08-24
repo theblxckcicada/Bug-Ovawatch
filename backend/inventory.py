@@ -328,6 +328,31 @@ def build_inventory(scan_id: str, project_id: str, roots: Iterable[str],
             if hasattr(item, "sources"):
                 item.sources.sort()
 
+    for asset in assets.values():
+        evidence = []
+        score = 0
+        if "authorized" in asset.states:
+            score, evidence = 100, ["explicitly_in_scope"]
+        else:
+            if asset.sources:
+                score += min(45, len(asset.sources) * 15)
+                evidence.append(f"observed_by_{len(asset.sources)}_source(s)")
+            if any(state in asset.states for state in {"dns_observed", "http_responding", "tcp_observed"}):
+                score += 30
+                evidence.append("actively_validated")
+            if any(
+                relation.target_asset_id == asset.id or relation.source_asset_id == asset.id
+                for relation in relationships.values()
+            ):
+                score += 15
+                evidence.append("correlated_relationship")
+        score = min(score, 100)
+        asset.attributes["ownership_score"] = score
+        asset.attributes["ownership_status"] = (
+            "confirmed" if score >= 75 else "probable" if score >= 45 else "unverified"
+        )
+        asset.attributes["ownership_evidence"] = evidence
+
     return InventorySnapshot(
         scan_id=scan_id, project_id=project_id,
         assets=sorted(assets.values(), key=lambda item: (item.type.value, item.value)),

@@ -4,7 +4,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
-import { Project, Target, Scan, ToolInfo } from '../../core/models';
+import { Project, Target, Scan, ToolInfo, ScanSchedule } from '../../core/models';
 
 const DEFAULT_TOOLS = [
   'crtsh','assetfinder','subfinder','amass','shuffledns',
@@ -192,6 +192,17 @@ const TOOL_GROUPS: Record<string, string[]> = {
               (click)="launchScan()">
               @if (launching()) { <span class="spinner-sm"></span> } Launch Scan ({{selectedTools.size}} tools)
             </button>
+
+            <div class="schedule-panel">
+              <div><b>Continuous monitoring</b><small>Run the current tool selection automatically. Overlapping assessments are prevented.</small></div>
+              <select class="form-input" [(ngModel)]="scheduleInterval">
+                <option [ngValue]="1440">Daily</option><option [ngValue]="10080">Weekly</option><option [ngValue]="43200">Monthly</option>
+              </select>
+              <button class="btn btn-outline btn-sm" (click)="createSchedule()">Create schedule</button>
+              @for (schedule of schedules(); track schedule.id) {
+                <div class="schedule-row"><span>Every {{schedule.interval_minutes}} minutes · next {{schedule.next_run_at | date:'short'}}</span><button class="btn btn-ghost btn-sm" (click)="deleteSchedule(schedule.id)">Remove</button></div>
+              }
+            </div>
           </div>
 
           <!-- Resume vs. new scan prompt -->
@@ -318,6 +329,11 @@ const TOOL_GROUPS: Record<string, string[]> = {
     .verification-option { display:flex; align-items:flex-start; gap:10px; margin:4px 0 18px; padding:12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-elevated); cursor:pointer; }
     .verification-option span { display:flex; flex-direction:column; gap:3px; font-size:12px; }
     .verification-option small { color:var(--text-dim); line-height:1.4; }
+    .schedule-panel { margin-top:20px;padding:14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap; }
+    .schedule-panel>div:first-child { display:flex;flex-direction:column;flex:1;min-width:220px; }
+    .schedule-panel small { color:var(--text-dim);font-size:10px; }
+    .schedule-panel select { width:120px; }
+    .schedule-row { flex-basis:100%;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-dim); }
     input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
     .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:200; }
     .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; max-width:460px; width:90%; }
@@ -330,6 +346,7 @@ export class ProjectDetailComponent implements OnInit {
   project = signal<Project | null>(null);
   targets = signal<Target[]>([]);
   scans = signal<Scan[]>([]);
+  schedules = signal<ScanSchedule[]>([]);
   availableTools = signal<ToolInfo[]>([]);
   launching = signal(false);
   showResumePrompt = signal(false);
@@ -346,6 +363,7 @@ export class ProjectDetailComponent implements OnInit {
   newOos = '';
   customWordlist = '';
   verifyEmails = false;
+  scheduleInterval = 10080;
   selectedTools = new Set<string>(DEFAULT_TOOLS);
 
   inscope = computed(() => this.targets().filter((t: any) => !t.is_oos));
@@ -360,6 +378,7 @@ export class ProjectDetailComponent implements OnInit {
     this.api.getTargets(id).subscribe(ts => this.targets.set(ts));
     this.api.getScans(id).subscribe(ss => this.scans.set(ss.sort((a,b) => b.created_at.localeCompare(a.created_at))));
     this.api.getTools().subscribe(ts => this.availableTools.set(ts));
+    this.api.getSchedules(id).subscribe(rows => this.schedules.set(rows));
   }
 
   toolAvail(name: string): boolean {
@@ -441,6 +460,20 @@ export class ProjectDetailComponent implements OnInit {
         next: scan => this.router.navigate(['/scan', scan.id, 'progress']),
         error: () => this.launching.set(false),
       });
+  }
+
+  createSchedule() {
+    const project = this.project();
+    if (!project || this.selectedTools.size === 0) return;
+    this.api.createSchedule(
+      project.id, [...this.selectedTools], this.scheduleInterval,
+      this.selectedTools.has('email_finder') && this.verifyEmails,
+    ).subscribe(schedule => this.schedules.update(rows => [...rows, schedule]));
+  }
+
+  deleteSchedule(id: string) {
+    this.api.deleteSchedule(id).subscribe(() =>
+      this.schedules.update(rows => rows.filter(schedule => schedule.id !== id)));
   }
 
   // ── Edit details (T4) ───────────────────────────────────────────

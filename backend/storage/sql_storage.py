@@ -122,6 +122,16 @@ class SqlStorage(BaseStorage):
             key TEXT PRIMARY KEY,
             payload TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS control_records (
+            kind TEXT NOT NULL,
+            id TEXT NOT NULL,
+            project_id TEXT NOT NULL DEFAULT '',
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(kind, id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_control_records_kind_project
+            ON control_records(kind, project_id);
         CREATE TABLE IF NOT EXISTS schema_meta (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -417,3 +427,45 @@ class SqlStorage(BaseStorage):
 
     async def load_auth(self) -> dict:
         return await self._load_config("auth")
+
+    async def save_control_record(
+        self, kind: str, record_id: str, payload: dict[str, Any], project_id: str = "",
+    ) -> None:
+        """Persist a typed platform workflow record in SQLite."""
+        await self._write(lambda db: db.execute(
+            "INSERT INTO control_records (kind, id, project_id, payload) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(kind, id) DO UPDATE SET project_id=excluded.project_id, payload=excluded.payload",
+            (kind, record_id, project_id, self._serialize(payload)),
+        ))
+
+    async def list_control_records(
+        self, kind: str, project_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Load workflow records, optionally scoped to one project."""
+        if project_id is None:
+            query, parameters = (
+                "SELECT payload FROM control_records WHERE kind=? ORDER BY created_at DESC",
+                (kind,),
+            )
+        else:
+            query, parameters = (
+                "SELECT payload FROM control_records WHERE kind=? AND project_id=? ORDER BY created_at DESC",
+                (kind, project_id),
+            )
+        payloads = await asyncio.to_thread(self._query_all, query, parameters)
+        return [json.loads(payload) for payload in payloads]
+
+    async def get_control_record(self, kind: str, record_id: str) -> dict[str, Any] | None:
+        """Load one workflow record by its compound key."""
+        payload = await asyncio.to_thread(
+            self._query_one,
+            "SELECT payload FROM control_records WHERE kind=? AND id=?",
+            (kind, record_id),
+        )
+        return json.loads(payload) if payload else None
+
+    async def delete_control_record(self, kind: str, record_id: str) -> None:
+        """Delete one typed workflow record idempotently."""
+        await self._write(lambda db: db.execute(
+            "DELETE FROM control_records WHERE kind=? AND id=?", (kind, record_id)
+        ))

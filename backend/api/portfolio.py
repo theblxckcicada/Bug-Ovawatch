@@ -10,6 +10,7 @@ from config import settings
 from inventory import compare_inventories
 from models import ScanStatus
 from tools.registry import get_tool, list_tools
+from control_models import SuppressionRule
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -45,6 +46,14 @@ async def _latest_snapshots():
 async def portfolio():
     """Aggregate latest inventories and drift across all application programs."""
     assets, findings, changes = [], [], []
+    finding_states = {
+        item["id"]: item for item in await _storage().list_control_records("finding_state")
+    }
+    suppression_rules = [
+        SuppressionRule.model_validate(item)
+        for item in await _storage().list_control_records("suppression")
+        if item.get("enabled", True)
+    ]
     programs_with_inventory = 0
     for project, current, previous in await _latest_snapshots():
         scan, snapshot = current
@@ -71,10 +80,27 @@ async def portfolio():
                 if asset.id in {relationship.source_asset_id, relationship.target_asset_id}
             ],
         } for asset in snapshot.assets)
-        findings.extend({
-            **finding.model_dump(), "project_id": project.id, "project_name": project.name,
-            "scan_id": scan.id, "asset_value": asset_values.get(finding.asset_id, "unknown"),
-        } for finding in snapshot.findings)
+        for finding in snapshot.findings:
+            workflow = finding_states.get(finding.id, {})
+            row = {
+                **finding.model_dump(), "project_id": project.id, "project_name": project.name,
+                "scan_id": scan.id, "asset_value": asset_values.get(finding.asset_id, "unknown"),
+                "disposition": workflow.get("disposition", "new"),
+                "assignee": workflow.get("assignee", ""),
+                "tags": workflow.get("tags", []),
+                "notes": workflow.get("notes", ""),
+            }
+            if workflow.get("severity_override"):
+                row["original_severity"] = row["severity"]
+                row["severity"] = workflow["severity_override"]
+            row["suppressed"] = any(
+                (not rule.project_id or rule.project_id == project.id)
+                and (not rule.tool or rule.tool.lower() == finding.tool.lower())
+                and (not rule.title_contains or rule.title_contains.lower() in finding.title.lower())
+                and (not rule.asset_contains or rule.asset_contains.lower() in row["asset_value"].lower())
+                for rule in suppression_rules
+            )
+            findings.append(row)
         delta = compare_inventories(snapshot, previous[1] if previous else None)
         changes.append({
             **delta.model_dump(), "project_id": project.id, "project_name": project.name,
@@ -89,9 +115,11 @@ async def portfolio():
             "projects": len(projects),
             "programs_with_inventory": programs_with_inventory,
             "assets": len(assets),
-            "findings": len(findings),
+            "findings": sum(1 for finding in findings if not finding.get("suppressed")),
             "critical_high": sum(
-                1 for finding in findings if finding["severity"].lower() in {"critical", "high"}
+                1 for finding in findings
+                if not finding.get("suppressed")
+                and finding["severity"].lower() in {"critical", "high"}
             ),
         },
     }

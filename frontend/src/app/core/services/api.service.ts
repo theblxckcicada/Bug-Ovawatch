@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Project, Target, Scan, ToolResult, ToolInfo, ToolApiKeysConfig, InventorySnapshot, InventoryDelta, PortfolioResponse, SystemStatus } from '../models';
+import { Project, Target, Scan, ToolResult, ToolInfo, ToolApiKeysConfig, InventorySnapshot, InventoryDelta, PortfolioResponse, SystemStatus, ScanSchedule } from '../models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -118,6 +118,38 @@ export class ApiService {
 
   evidenceBlobUrl(scanId: string, blobId: string): string {
     return `${this.base}/results/${scanId}/evidence/${encodeURIComponent(blobId)}?${this.authTokenQuery()}`;
+  }
+
+  reportUrl(scanId: string, format: 'html'|'markdown'|'csv'|'json'|'sarif'): string {
+    const token = this.auth.token;
+    const suffix = token ? `&token=${encodeURIComponent(token)}` : '';
+    return `${this.base}/reports/${scanId}/export?format=${format}${suffix}`;
+  }
+
+  graphUrl(scanId: string): string {
+    const token = this.auth.token;
+    const suffix = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${this.base}/reports/${scanId}/graph${suffix}`;
+  }
+
+  getSchedules(projectId: string): Observable<ScanSchedule[]> {
+    return this.http.get<ScanSchedule[]>(`${this.base}/control/schedules?project_id=${encodeURIComponent(projectId)}`);
+  }
+
+  createSchedule(projectId: string, tools: string[], intervalMinutes: number, verifyEmails = false): Observable<ScanSchedule> {
+    return this.http.post<ScanSchedule>(`${this.base}/control/schedules`, {
+      project_id: projectId, tools, interval_minutes: intervalMinutes, verify_emails: verifyEmails,
+    });
+  }
+
+  deleteSchedule(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/control/schedules/${id}`);
+  }
+
+  updateFindingState(findingId: string, projectId: string, disposition: string): Observable<unknown> {
+    return this.http.put(`${this.base}/control/finding-states/${findingId}`, {
+      project_id: projectId, disposition, assignee: '', tags: [], notes: '', severity_override: '',
+    });
   }
 
   /** Token as an extra query param — artifacts load via <img>/<a>, which can't set headers. */
