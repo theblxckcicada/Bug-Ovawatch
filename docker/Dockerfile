@@ -63,6 +63,9 @@ RUN go install github.com/projectdiscovery/naabu/v2/cmd/naabu@v2.6.1 \
 RUN go install github.com/projectdiscovery/tlsx/cmd/tlsx@v1.3.0 \
     && cp /go/bin/tlsx /staging/
 
+RUN go install github.com/ffuf/ffuf/v2@v2.1.0 \
+    && cp /go/bin/ffuf /staging/
+
 # ── Vuln & Screenshots ───────────────────────────────────────────
 RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.8.0 \
     && cp /go/bin/nuclei /staging/
@@ -143,6 +146,7 @@ RUN gem install wpscan --no-document 2>&1 \
 WORKDIR /app
 COPY backend/ ./backend/
 RUN pip3 install --no-cache-dir -r backend/requirements.txt
+RUN pip3 install --no-cache-dir wafw00f==2.3.2
 
 # All Go binaries from staging. Copy after pip install so Python console scripts
 # cannot overwrite ProjectDiscovery binaries such as httpx. The PD binary is

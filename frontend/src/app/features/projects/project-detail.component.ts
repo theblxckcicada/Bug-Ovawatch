@@ -18,9 +18,9 @@ const TOOL_GROUPS: Record<string, string[]> = {
   'Subdomain Enumeration': ['crtsh','assetfinder','subfinder','amass','shuffledns'],
   'DNS':                   ['dnsx','dns_records','zone_transfer'],
   'HTTP & Ports':          ['httpx','naabu'],
-  'Vulnerability':         ['nuclei','cve_check','subdomain_takeover','wpscan'],
-  'Screenshots, Dorks & Tech': ['gowitness','whatweb','google_dorks'],
-  'URL Discovery':         ['waybackurls','gau','katana','urlfinder'],
+  'Vulnerability':         ['nuclei','cve_check','subdomain_takeover','wpscan','secret_exposure','web_posture'],
+  'Screenshots, Dorks & Tech': ['gowitness','whatweb','wafw00f','google_dorks'],
+  'URL Discovery':         ['waybackurls','gau','katana','urlfinder','ffuf'],
   'Asset Discovery':       ['whois','asnmap','shodan','email_finder'],
   'AI':                    ['ai_analysis'],
 };

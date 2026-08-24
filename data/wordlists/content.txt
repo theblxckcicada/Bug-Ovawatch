@@ -1,0 +1,17 @@
+admin
+api
+assets
+backup
+config
+dashboard
+debug
+docs
+health
+login
+metrics
+robots.txt
+sitemap.xml
+swagger
+uploads
+.env
+.git/HEAD

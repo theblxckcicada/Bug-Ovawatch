@@ -19,8 +19,12 @@ from tools.dns.zone_transfer     import ZoneTransferTool
 from tools.http.httpx_tool       import HttpxTool
 from tools.http.naabu            import NaabuTool
 from tools.http.tlsx_tool        import TlsxTool
+from tools.http.ffuf_tool        import FfufTool
+from tools.http.wafw00f_tool     import Wafw00fTool
 from tools.vuln.nuclei           import NucleiTool
 from tools.vuln.cve_check        import CveCheckTool
+from tools.vuln.secret_exposure  import SecretExposureTool
+from tools.vuln.web_posture      import WebPostureTool
 from tools.vuln.subdomain_takeover import SubdomainTakeoverTool
 from tools.vuln.wpscan           import WpscanTool
 from tools.screenshots.gowitness import GowitnessTool
@@ -54,9 +58,13 @@ REGISTRY: dict[str, type[BaseTool]] = {
     "httpx":        HttpxTool,
     "naabu":        NaabuTool,
     "tlsx":         TlsxTool,
+    "ffuf":         FfufTool,
+    "wafw00f":      Wafw00fTool,
     # Vulnerability scanning
     "nuclei":       NucleiTool,
     "cve_check":    CveCheckTool,
+    "secret_exposure": SecretExposureTool,
+    "web_posture":  WebPostureTool,
     "subdomain_takeover": SubdomainTakeoverTool,
     "wpscan":       WpscanTool,
     # Screenshots & Tech
