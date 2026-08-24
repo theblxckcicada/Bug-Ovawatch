@@ -24,7 +24,7 @@
     @if (cleanupMessage()) { <div class="alert alert-success">{{cleanupMessage()}}</div> }
     @if (cleanupError()) { <div class="alert alert-danger">{{cleanupError()}}</div> }
     @if (artifactsDeletedAt() && !cleanupMessage()) {
-      <div class="alert alert-warning">Raw output files were deleted on {{artifactsDeletedAt() | date:'medium'}}. Database-backed results, inventory, and findings remain available; artifact downloads and screenshots are no longer available.</div>
+      <div class="alert alert-info">Transient tool outputs were deleted on {{artifactsDeletedAt() | date:'medium'}}. Database-backed results, inventory, findings, and screenshots remain available.</div>
     }
 
     @if (isLive()) {

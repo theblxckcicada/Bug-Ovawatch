@@ -26,9 +26,14 @@ def _seed(store: SqlStorage, project_id: str, scan_id: str) -> None:
 def test_delete_results_removes_only_results(tmp_path: Path):
     store = SqlStorage(tmp_path)
     _seed(store, "p1", "s1")
+    blob_id = asyncio.run(store.save_evidence_blob(
+        "s1", "capture.png", "image/png", b"image-bytes", "digest-1"
+    ))
     assert asyncio.run(store.list_results("s1"))
+    assert asyncio.run(store.get_evidence_blob("s1", blob_id)) is not None
     asyncio.run(store.delete_results("s1"))
     assert asyncio.run(store.list_results("s1")) == []
+    assert asyncio.run(store.get_evidence_blob("s1", blob_id)) is None
     # The scan record itself is retained.
     assert asyncio.run(store.get_scan("s1")) is not None
 

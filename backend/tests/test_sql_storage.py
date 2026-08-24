@@ -66,6 +66,22 @@ async def test_auth_and_tool_keys_are_sql_backed(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_output_database_migrates_to_durable_database_directory(tmp_path: Path) -> None:
+    """Existing installations retain SQL data when output and database storage split."""
+    output_dir = tmp_path / "output"
+    database_dir = tmp_path / "data" / "database"
+    legacy_storage = SqlStorage(output_dir)
+    project = Project(name="Existing program")
+    await legacy_storage.save_project(project)
+
+    migrated_storage = SqlStorage(database_dir, output_dir=output_dir)
+
+    assert migrated_storage.database_path == database_dir / "shadowgrid.db"
+    assert await migrated_storage.get_project(project.id) == project
+    assert (output_dir / "shadowgrid.db").exists()
+
+
+@pytest.mark.asyncio
 async def test_legacy_json_is_imported_once(tmp_path: Path) -> None:
     """Existing deployments retain metadata and authentication during upgrade."""
     legacy = tmp_path / ".meta"

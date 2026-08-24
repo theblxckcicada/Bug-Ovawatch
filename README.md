@@ -146,7 +146,7 @@ By default the reset rotates the token-signing secret (logging out all sessions)
                  │
 ┌────────────────▼─────────────────────────┐
 │  Storage Layer                           │
-│  ├─ SQLite: output/shadowgrid.db         │
+│  ├─ SQLite: data/database/shadowgrid.db  │
 │  │    projects, targets, scans, results, │
 │  │    inventory, auth, configuration     │
 │  └─ Evidence filesystem                 │
@@ -174,7 +174,7 @@ Between phases, ShadowGrid writes canonical hand-off artifacts — `subdomains_m
 
 **Notes**
 - **Cancel deletes data:** every assessment owns an isolated `projects/<project-id>/scans/<scan-id>/assets/` workspace. Cancelling kills in-flight processes and deletes that assessment's results, progress, and artifacts without affecting another run.
-- **Raw-output cleanup:** a completed, failed, or cancelled assessment can delete its isolated raw artifact workspace from the Results page while retaining the assessment, parsed tool results, normalized inventory, relationships, and findings in SQLite. Active assessments are protected from cleanup.
+- **Raw-output cleanup:** the filesystem workspace is transient ingestion storage. Screenshots are persisted as deduplicated SQLite BLOBs and all parsed evidence is stored in database records before a completed, failed, or cancelled assessment can remove its isolated raw workspace. The assessment, results, inventory, relationships, findings, and screenshot gallery remain available; active assessments are protected from cleanup.
 - **Clear program data:** from a program's page you can wipe **all** of its assessment history — every run including cancelled ones, and their results — while keeping the program and its scope. Any still-running assessment is terminated first.
 - **Edit program details:** a program's name and description can be changed at any time after creation (`PATCH /api/projects/{id}`).
 - **Resume vs. fresh:** reuse is permitted only from one completed assessment with the same scope, exclusions, selected tools, and wordlist fingerprint. Its evidence snapshot is copied into the new workspace before results are reused.
@@ -275,11 +275,14 @@ docker compose -f docker/docker-compose.yml down
 ## SQL Storage
 
 SQLite is the mandatory primary store and requires no external service or paid
-account. The database is `output/shadowgrid.db` and uses WAL mode, foreign keys,
+account. The database is `data/database/shadowgrid.db` and uses WAL mode, foreign keys,
 transactional upserts, and cascade deletes. On the first SQL-backed startup,
 ShadowGrid imports existing projects, targets, scans, results, inventories,
 authentication, and tool keys from `output/.meta/`. The legacy JSON tree is left
 untouched as a recovery copy but is no longer read after migration.
+Existing `output/shadowgrid.db` installations are copied automatically into the
+durable data volume on first startup. The output volume then contains transient
+tool workspaces only and can be cleaned without deleting authoritative records.
 
 ---
 

@@ -440,6 +440,10 @@ async def _run_tool(
     # Resume support: if this is a resumed scan and a prior successful result exists
     # for (domain, tool), copy it forward instead of re-running the tool.
     prior = _reuse_maps.get(scan.id, {}).get((domain, tool_name))
+    # Evidence BLOBs are owned by one scan. Capture screenshots again instead of
+    # copying metadata whose blob_id belongs to the previous assessment.
+    if tool_name == "gowitness":
+        prior = None
     if prior is not None:
         reused = ToolResult(
             scan_id=scan.id, project_id=scan.project_id, tool=tool_name,
@@ -480,6 +484,8 @@ async def _run_tool(
 
     try:
         result = await tool.execute(domain, scan.id, scan.project_id, oos, wordlist)
+        from evidence import persist_result_evidence
+        await persist_result_evidence(result, output_dir, storage)
         await storage.save_result(result)
         completed_tools_ref["value"] += 1
         overall_completed_tools_ref["value"] += 1

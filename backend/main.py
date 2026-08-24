@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── Global storage instance (singleton) ──────────────────────────
-storage = SqlStorage(settings.output_dir)
+storage = SqlStorage(settings.database_dir, output_dir=settings.output_dir)
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
     # Ensure output / data dirs exist
     Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.data_dir).mkdir(parents=True, exist_ok=True)
+    Path(settings.database_dir).mkdir(parents=True, exist_ok=True)
 
     apply_tool_api_keys(await storage.load_tool_api_keys())
 
@@ -52,6 +53,15 @@ async def lifespan(app: FastAPI):
                 recovered += 1
     if recovered:
         logger.warning("Marked %d interrupted assessment(s) as failed", recovered)
+
+    # One-time-per-row, SHA-deduplicated compatibility pass for assessments made
+    # before screenshots were persisted as SQLite BLOBs. This completes before
+    # the API accepts cleanup requests, so an old raw workspace can be removed
+    # without losing its screenshot gallery.
+    from evidence import backfill_screenshot_evidence
+    backfilled = await backfill_screenshot_evidence(storage, Path(settings.output_dir))
+    if backfilled:
+        logger.info("Persisted %d legacy screenshot(s) in SQLite", backfilled)
 
     logger.info("ShadowGrid backend started")
     yield

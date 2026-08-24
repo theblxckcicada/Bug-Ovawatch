@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from config import settings
 from models import ScanStatus, now_utc
@@ -104,6 +104,27 @@ async def get_artifact_text(scan_id: str, path: str = Query(..., min_length=1)):
     return artifact.read_text(errors="replace")
 
 
+@router.get("/{scan_id}/evidence/{blob_id}")
+async def get_database_evidence(scan_id: str, blob_id: str):
+    """Serve durable binary evidence directly from SQLite."""
+    blob = await _get_storage().get_evidence_blob(scan_id, blob_id)
+    if not blob:
+        raise HTTPException(404, "Evidence not found")
+    safe_filename = "".join(
+        char if char.isalnum() or char in {".", "-", "_"} else "_"
+        for char in Path(blob["filename"]).name
+    ) or "evidence.bin"
+    return Response(
+        content=blob["content"],
+        media_type=blob["mime_type"],
+        headers={
+            "Cache-Control": "private, max-age=86400",
+            "Content-Disposition": f'inline; filename="{safe_filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.delete("/{scan_id}/artifacts")
 async def delete_raw_artifacts(scan_id: str):
     """Delete raw files for a finished scan while retaining all SQL records."""
@@ -116,6 +137,16 @@ async def delete_raw_artifacts(scan_id: str):
 
     workspace = _scan_workspace_path(scan)
     file_count, byte_count = await asyncio.to_thread(_workspace_stats, workspace)
+
+    # Backfill durable screenshots for assessments created before BLOB ingestion
+    # was introduced. Save updated result metadata before removing the raw files.
+    from evidence import persist_result_evidence
+    screenshots_stored = 0
+    for result in await storage.list_results(scan.id):
+        stored = await persist_result_evidence(result, workspace, storage)
+        if stored:
+            screenshots_stored += stored
+            await storage.save_result(result)
     await storage.delete_scan_artifacts(scan)
 
     scan.artifacts_deleted_at = now_utc()
@@ -124,6 +155,7 @@ async def delete_raw_artifacts(scan_id: str):
         "scan_id": scan.id,
         "files_deleted": file_count,
         "bytes_freed": byte_count,
+        "screenshots_stored": screenshots_stored,
         "artifacts_deleted_at": scan.artifacts_deleted_at,
         "database_records_retained": True,
     }

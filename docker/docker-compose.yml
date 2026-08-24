@@ -13,6 +13,7 @@ services:
     environment:
       - OUTPUT_DIR=/app/output
       - DATA_DIR=/app/data
+      - DATABASE_DIR=/app/data/database
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - PDCP_API_KEY=${PDCP_API_KEY:-}
     security_opt:

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # ── Storage ─────────────────────────────────────────
     output_dir: str = "/app/output"
     data_dir:   str = "/app/data"
+    database_dir: str = "/app/data/database"
 
     # ── Scan engine ─────────────────────────────────────
     max_concurrent_tool_groups: int = 4   # groups run in parallel
@@ -36,6 +37,10 @@ class Settings(BaseSettings):
     @property
     def data_path(self) -> Path:
         return Path(self.data_dir)
+
+    @property
+    def database_path(self) -> Path:
+        return Path(self.database_dir)
 
 
 settings = Settings()

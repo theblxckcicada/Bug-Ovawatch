@@ -55,6 +55,16 @@ class BaseStorage(ABC):
         """Delete the isolated filesystem workspace owned by a scan."""
         return None
 
+    async def save_evidence_blob(
+        self, scan_id: str, filename: str, mime_type: str, content: bytes, sha256: str,
+    ) -> str:
+        """Persist binary evidence and return its stable identifier."""
+        raise NotImplementedError
+
+    async def get_evidence_blob(self, scan_id: str, blob_id: str) -> dict | None:
+        """Load binary evidence owned by a scan."""
+        raise NotImplementedError
+
     async def save_inventory(self, snapshot: InventorySnapshot) -> None:
         """Persist a normalized inventory snapshot."""
         raise NotImplementedError

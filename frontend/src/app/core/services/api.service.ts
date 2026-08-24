@@ -75,8 +75,8 @@ export class ApiService {
     return this.http.get<any>(`${this.base}/results/${scanId}/summary`);
   }
   /** Delete filesystem artifacts while retaining assessment records in SQLite. */
-  deleteRawOutputs(scanId: string): Observable<{ files_deleted: number; bytes_freed: number; database_records_retained: boolean }> {
-    return this.http.delete<{ files_deleted: number; bytes_freed: number; database_records_retained: boolean }>(`${this.base}/results/${scanId}/artifacts`);
+  deleteRawOutputs(scanId: string): Observable<{ files_deleted: number; bytes_freed: number; screenshots_stored: number; database_records_retained: boolean }> {
+    return this.http.delete<{ files_deleted: number; bytes_freed: number; screenshots_stored: number; database_records_retained: boolean }>(`${this.base}/results/${scanId}/artifacts`);
   }
 
   getInventory(scanId: string): Observable<InventorySnapshot> {
@@ -116,9 +116,19 @@ export class ApiService {
     return `${this.base}/results/${scanId}/artifact-text?path=${encodeURIComponent(path)}${this.tokenQuery()}`;
   }
 
+  evidenceBlobUrl(scanId: string, blobId: string): string {
+    return `${this.base}/results/${scanId}/evidence/${encodeURIComponent(blobId)}?${this.authTokenQuery()}`;
+  }
+
   /** Token as an extra query param — artifacts load via <img>/<a>, which can't set headers. */
   private tokenQuery(): string {
     const token = this.auth.token;
     return token ? `&token=${encodeURIComponent(token)}` : '';
+  }
+
+
+  private authTokenQuery(): string {
+    const token = this.auth.token;
+    return token ? `token=${encodeURIComponent(token)}` : '';
   }
 }

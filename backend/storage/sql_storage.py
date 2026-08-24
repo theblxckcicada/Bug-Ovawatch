@@ -7,6 +7,7 @@ import logging
 import shutil
 import sqlite3
 import threading
+import uuid
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -26,11 +27,16 @@ class SqlStorage(BaseStorage):
     coordinate multiple worker threads without holding an event loop hostage.
     """
 
-    def __init__(self, output_dir: str | Path):
-        self._base = Path(output_dir)
+    def __init__(
+        self, database_dir: str | Path, *, output_dir: str | Path | None = None,
+    ):
+        self._base = Path(output_dir) if output_dir is not None else Path(database_dir)
         self._base.mkdir(parents=True, exist_ok=True)
-        self._database = self._base / "shadowgrid.db"
+        self._database_root = Path(database_dir)
+        self._database_root.mkdir(parents=True, exist_ok=True)
+        self._database = self._database_root / "shadowgrid.db"
         self._write_lock = threading.RLock()
+        self._migrate_output_database()
         self._initialize()
         self._migrate_legacy_json()
 
@@ -43,6 +49,23 @@ class SqlStorage(BaseStorage):
     def database_path(self) -> Path:
         """Return the mandatory SQLite database path."""
         return self._database
+
+    def _migrate_output_database(self) -> None:
+        """Copy the pre-separation output database into durable data storage once."""
+        legacy_database = self._base / "shadowgrid.db"
+        if (
+            self._database.resolve() == legacy_database.resolve()
+            or self._database.exists()
+            or not legacy_database.is_file()
+        ):
+            return
+        with sqlite3.connect(legacy_database) as source, sqlite3.connect(self._database) as target:
+            source.backup(target)
+        logger.info(
+            "Migrated SQLite database from transient output storage %s to %s",
+            legacy_database,
+            self._database,
+        )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self._database, timeout=30)
@@ -83,6 +106,18 @@ class SqlStorage(BaseStorage):
             payload TEXT NOT NULL,
             FOREIGN KEY(scan_id) REFERENCES scans(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS evidence_blobs (
+            id TEXT PRIMARY KEY,
+            scan_id TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            content BLOB NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(scan_id) REFERENCES scans(id) ON DELETE CASCADE,
+            UNIQUE(scan_id, sha256)
+        );
+        CREATE INDEX IF NOT EXISTS idx_evidence_blobs_scan ON evidence_blobs(scan_id);
         CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
             payload TEXT NOT NULL
@@ -278,7 +313,11 @@ class SqlStorage(BaseStorage):
         )
 
     async def delete_results(self, scan_id: str) -> None:
-        await self._write(lambda db: db.execute("DELETE FROM results WHERE scan_id=?", (scan_id,)))
+        def delete_rows(db: sqlite3.Connection) -> None:
+            db.execute("DELETE FROM evidence_blobs WHERE scan_id=?", (scan_id,))
+            db.execute("DELETE FROM results WHERE scan_id=?", (scan_id,))
+
+        await self._write(delete_rows)
 
     async def delete_scan_artifacts(self, scan: Scan) -> None:
         """Delete only the filesystem workspace owned by the supplied scan."""
@@ -293,6 +332,54 @@ class SqlStorage(BaseStorage):
         if scan_dir != expected:
             raise ValueError("Scan workspace does not match its scan identifier")
         await asyncio.to_thread(shutil.rmtree, scan_dir, True)
+
+    def _save_evidence_blob(
+        self, scan_id: str, filename: str, mime_type: str, content: bytes, sha256: str,
+    ) -> str:
+        """Insert a deduplicated evidence BLOB in one serialized transaction."""
+        with self._write_lock, self._connect() as connection:
+            existing = connection.execute(
+                "SELECT id FROM evidence_blobs WHERE scan_id=? AND sha256=?",
+                (scan_id, sha256),
+            ).fetchone()
+            if existing:
+                return str(existing["id"])
+            blob_id = str(uuid.uuid4())
+            connection.execute(
+                "INSERT INTO evidence_blobs "
+                "(id, scan_id, filename, mime_type, sha256, content) VALUES (?, ?, ?, ?, ?, ?)",
+                (blob_id, scan_id, filename, mime_type, sha256, content),
+            )
+            return blob_id
+
+    async def save_evidence_blob(
+        self, scan_id: str, filename: str, mime_type: str, content: bytes, sha256: str,
+    ) -> str:
+        """Persist binary evidence in SQLite, deduplicated within its scan."""
+        return await asyncio.to_thread(
+            self._save_evidence_blob, scan_id, filename, mime_type, content, sha256
+        )
+
+    def _get_evidence_blob(self, scan_id: str, blob_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, filename, mime_type, sha256, content "
+                "FROM evidence_blobs WHERE id=? AND scan_id=?",
+                (blob_id, scan_id),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "id": str(row["id"]),
+            "filename": str(row["filename"]),
+            "mime_type": str(row["mime_type"]),
+            "sha256": str(row["sha256"]),
+            "content": bytes(row["content"]),
+        }
+
+    async def get_evidence_blob(self, scan_id: str, blob_id: str) -> dict[str, Any] | None:
+        """Load a scan-owned evidence BLOB without exposing another scan's data."""
+        return await asyncio.to_thread(self._get_evidence_blob, scan_id, blob_id)
 
     async def save_inventory(self, snapshot: InventorySnapshot) -> None:
         await self._write(lambda db: db.execute(

@@ -17,7 +17,7 @@ Interactive (recommended) — prompts twice, nothing hits the shell history::
 
     python3 reset_password.py
 
-Inside the Docker container (SQLite lives in the ``shadowgrid-output`` volume)::
+Inside the Docker container (SQLite lives in the ``shadowgrid-data`` volume)::
 
     docker exec -it shadowgrid python3 /app/backend/reset_password.py
 
@@ -27,7 +27,7 @@ Non-interactive / automation (password from stdin)::
 
 Explicit data location when running on the host::
 
-    python3 reset_password.py --output-dir /var/lib/shadowgrid/output
+    python3 reset_password.py --database-dir /var/lib/shadowgrid/database
 
 By default the token-signing secret is rotated, logging out all existing
 sessions. Pass ``--keep-sessions`` to preserve current logins.
@@ -52,14 +52,14 @@ logger = logging.getLogger("shadowgrid.reset_password")
 MIN_PASSWORD_LENGTH = 8
 
 
-def _default_output_dir() -> str:
-    """Resolve the output directory the app uses, honouring OUTPUT_DIR / .env."""
+def _default_database_dir() -> str:
+    """Resolve the durable database directory, honouring DATABASE_DIR / .env."""
     try:
         from config import settings
 
-        return settings.output_dir
+        return settings.database_dir
     except Exception:  # pragma: no cover - config import is best-effort here
-        return os.environ.get("OUTPUT_DIR", "/app/output")
+        return os.environ.get("DATABASE_DIR", "/app/data/database")
 
 
 def _read_password(supplied: str | None) -> str:
@@ -110,10 +110,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "list. Prefer the interactive prompt or piping via stdin.",
     )
     parser.add_argument(
+        "--database-dir",
         "--output-dir",
+        dest="database_dir",
         default=None,
-        help="ShadowGrid output directory holding shadowgrid.db. "
-        "Defaults to the app's configured OUTPUT_DIR.",
+        help="Directory holding shadowgrid.db. --output-dir remains as a backwards-compatible alias. "
+        "Defaults to the configured DATABASE_DIR.",
     )
     parser.add_argument(
         "--keep-sessions",
@@ -129,11 +131,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     args = _parse_args(argv)
 
-    output_dir = Path(args.output_dir or _default_output_dir())
+    database_dir = Path(args.database_dir or _default_database_dir())
     try:
-        storage = SqlStorage(output_dir)
+        storage = SqlStorage(database_dir)
     except OSError as exc:
-        logger.error("Cannot access output directory %s: %s", output_dir, exc)
+        logger.error("Cannot access database directory %s: %s", database_dir, exc)
         return 1
 
     existing = asyncio.run(storage.load_auth())

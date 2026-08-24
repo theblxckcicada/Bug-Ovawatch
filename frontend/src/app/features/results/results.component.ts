@@ -148,8 +148,8 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.isLive() || this.deletingArtifacts() || this.artifactsDeletedAt()) return;
     const confirmed = window.confirm(
       'Delete this assessment\'s raw output files?\n\n' +
-      'Database records, findings, inventory, and the assessment will be kept. ' +
-      'Screenshots, raw logs, tool JSON/TXT files, and downloadable artifacts cannot be recovered.'
+      'Database records, findings, inventory, screenshots, and the assessment will be kept. ' +
+      'Raw logs and original tool JSON/TXT files cannot be recovered.'
     );
     if (!confirmed) return;
 
@@ -161,7 +161,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
         this.deletingArtifacts.set(false);
         this.artifactsDeletedAt.set(new Date().toISOString());
         this.cleanupMessage.set(
-          `Deleted ${result.files_deleted} raw file(s) and freed ${this.formatBytes(result.bytes_freed)}. Database records were retained.`
+          `Deleted ${result.files_deleted} transient file(s) and freed ${this.formatBytes(result.bytes_freed)}. Database records and screenshots were retained.`
         );
       },
       error: error => {
@@ -390,6 +390,7 @@ export class ResultsComponent implements OnInit, AfterViewInit, OnDestroy {
   copyItem(item: any, key: string) { this.copy(item[key] || ''); }
 
   artifactSrc(item: any): string {
+    if (item?.['blob_id']) return this.api.evidenceBlobUrl(this.scanId, item['blob_id']);
     return item?.['path'] ? this.api.artifactUrl(this.scanId, item['path']) : '';
   }
 
